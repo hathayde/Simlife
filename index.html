@@ -1,0 +1,747 @@
+import pygame
+import random
+import math
+import uuid
+import matplotlib.pyplot as plt  # Para visualização dos dados ao final
+import csv
+
+# Inicialização do Pygame
+pygame.init()
+
+# =========================
+# CONFIGURAÇÕES DA JANELA
+# =========================
+LARGURA = 1800                # Largura total (simulação + área de informações)
+ALTURA = 900
+AREA_SIMULACAO_LARGURA = 900   # Largura da área de simulação
+TELA = pygame.display.set_mode((LARGURA, ALTURA))
+pygame.display.set_caption('Simulação de Evolução Bacteriana')
+
+# =========================
+# CORES
+# =========================
+PRETO = (0, 0, 0)
+BRANCO = (255, 255, 255)
+
+# =========================
+# PARÂMETROS DA GRADE
+# =========================
+CELL_SIZE = 50
+GRID_WIDTH = (AREA_SIMULACAO_LARGURA // CELL_SIZE) + 1
+GRID_HEIGHT = (ALTURA // CELL_SIZE) + 1
+
+# =========================
+# LIMITES
+# =========================
+MAX_BACTERIAS = 1000
+MAX_ALGAS = 500
+
+# =========================
+# PARÂMETROS DE ENERGIA, MOVIMENTO, REPRODUÇÃO, ETC.
+# =========================
+ENERGY_COST_MOVE = 0.02
+ENERGY_LOSS_NO_PREY = 0.1
+ENERGY_GAIN_ALGA = 30
+ENERGY_GAIN_BACTERIA = 50
+ENERGY_LOSS_FAILED_ATTACK = 10
+REPULSION_FACTOR = 0.1
+
+BACTERIA_REPRODUCTION_THRESHOLD = 200
+ALGA_REPRODUCTION_THRESHOLD = 120
+
+PHOTOSYNTHESIS_GAIN = 2.0
+
+RAIO_DETECAO = 100
+DURACAO_CICLO = 500  # ticks para alternância entre dia e noite
+
+# =========================
+# PARÂMETROS DE MUTAÇÃO E APRENDIZADO
+# =========================
+CHANCE_MUTACAO = 0.2  # ajustável em tempo real
+CHANCE_MUTACAO_INTELIGENCIA = 0.1
+SPEED_MUTATION_DELTA = 0.5
+SIZE_MUTATION_DELTA = 2
+LIFE_EXPECTANCY_MUTATION_DELTA = 300
+
+# =========================
+# PARÂMETROS DO MAPA DE PHEROMÔNIOS
+# =========================
+PHEROMONE_DECAY = 0.95
+PHEROMONE_BOOST = 5.0
+
+# =========================
+# VARIÁVEIS GLOBAIS E HISTÓRICO
+# =========================
+ciclo_luz = 'dia'
+paused = False  # Para pausa interativa
+
+historico_populacoes = []
+historico_tempo = []
+
+cores_especies = {}  # Para associar uma cor única a cada espécie
+
+bacterias = []
+algas = []
+carcacas = []
+
+# As grids serão reconstruídas a cada tick
+grid_bacterias = [[[] for _ in range(GRID_HEIGHT)] for _ in range(GRID_WIDTH)]
+grid_algas = [[[] for _ in range(GRID_HEIGHT)] for _ in range(GRID_WIDTH)]
+grid_carcacas = [[[] for _ in range(GRID_HEIGHT)] for _ in range(GRID_WIDTH)]
+
+# =========================
+# SISTEMA DE PARTÍCULAS
+# =========================
+class Particle:
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+        self.vx = random.uniform(-1, 1)
+        self.vy = random.uniform(-1, 1)
+        self.life = random.randint(20, 40)
+        self.color = (255, 255, 0)  # Amarelo
+
+    def update(self):
+        self.x += self.vx
+        self.y += self.vy
+        self.life -= 1
+
+    def draw(self, surface):
+        if self.life > 0:
+            pygame.draw.circle(surface, self.color, (int(self.x), int(self.y)), 2)
+
+particles = []  # Lista global de partículas
+
+# =========================
+# AMBIENTE: MAPA DE NUTRIENTES E PHEROMÔNIOS
+# =========================
+def init_environment():
+    """Inicializa o mapa de nutrientes para cada célula da área de simulação."""
+    global environment_nutrient_map
+    environment_nutrient_map = [
+        [random.uniform(0.8, 1.2) for _ in range(GRID_HEIGHT)]
+        for _ in range(GRID_WIDTH)
+    ]
+
+def init_pheromone_map():
+    """Inicializa o mapa de pheromônios com zeros."""
+    global pheromone_map
+    pheromone_map = [
+        [0.0 for _ in range(GRID_HEIGHT)]
+        for _ in range(GRID_WIDTH)
+    ]
+
+def update_pheromones():
+    """Decai os valores de pheromônio em cada célula."""
+    global pheromone_map
+    for i in range(GRID_WIDTH):
+        for j in range(GRID_HEIGHT):
+            pheromone_map[i][j] *= PHEROMONE_DECAY
+
+# Função que "trava" (clamp) o fator e mapeia para uma cor RGB
+def nutrient_color(factor):
+    """
+    Mapeia um fator de nutrientes (idealmente entre 0.8 e 1.2) para uma cor.
+    Caso o valor esteja fora desse intervalo, ele é travado para [0.8, 1.2].
+    Valores mais baixos serão mais avermelhados e valores mais altos, mais esverdeados.
+    """
+    clamped = max(0.8, min(factor, 1.2))
+    ratio = (clamped - 0.8) / 0.4  # Normaliza para [0, 1]
+    r = int(128 * (1 - ratio))
+    g = int(128 * ratio)
+    b = 0
+    return (r, g, b)
+
+init_environment()
+init_pheromone_map()
+
+# =========================
+# FUNÇÃO AUXILIAR PARA ESCOLHER PRESA
+# =========================
+def escolher_presa(especie_atual):
+    especies_contagem = {}
+    for b in bacterias:
+        if b.especie != especie_atual:
+            especies_contagem[b.especie] = especies_contagem.get(b.especie, 0) + 1
+    if len(algas) > 0:
+        especies_contagem['alga'] = len(algas)
+    if len(carcacas) > 0:
+        especies_contagem['carcaca'] = len(carcacas)
+    if especies_contagem:
+        return max(especies_contagem, key=especies_contagem.get)
+    else:
+        return 'alga'
+
+# =========================
+# CLASSES DOS ORGANISMOS
+# =========================
+class Carcaca:
+    def __init__(self, x, y, energia):
+        self.x = x
+        self.y = y
+        self.energia = energia
+        self.tamanho = 3
+        self.cor = (139, 69, 19)  # Marrom
+
+    def desenhar(self):
+        pygame.draw.circle(TELA, self.cor, (int(self.x), int(self.y)), self.tamanho)
+
+class Bacteria:
+    def __init__(self, x, y, genes=None, presa=None):
+        self.x = x
+        self.y = y
+        self.energia = 100
+        self.direcao = random.uniform(0, 2 * math.pi)
+        self.idade = 0
+        self.memoria = None  # Para "aprender" boa posição de alimento
+
+        if genes:
+            self.genes = genes.copy()
+        else:
+            self.genes = {
+                'velocidade': random.uniform(0.5, 1.5),
+                'tamanho': random.randint(4, 6),
+                'inteligencia': False,      # Padrão: não inteligente
+                'especie': 'bacteria_base', # Espécie inicial
+                'esperanca_vida': random.randint(1000, 2000),
+                'defesa': random.uniform(0, 1),
+                'ataque': random.uniform(0, 1)
+            }
+        self.aplicar_genes()
+        self.esperanca_vida = self.genes.get('esperanca_vida', random.randint(1000, 2000))
+        self.presa = presa if presa else 'alga'
+        if self.especie not in cores_especies:
+            cores_especies[self.especie] = self.gerar_cor_unica()
+        self.cor = cores_especies[self.especie]
+
+    def aplicar_genes(self):
+        self.velocidade = self.genes['velocidade']
+        self.tamanho = self.genes['tamanho']
+        self.inteligencia = self.genes['inteligencia']
+        self.especie = self.genes['especie']
+        self.defesa = self.genes['defesa']
+        self.ataque = self.genes['ataque']
+
+    def gerar_cor_unica(self):
+        while True:
+            nova_cor = (random.randint(50, 255), random.randint(50, 255), random.randint(50, 255))
+            if nova_cor not in cores_especies.values():
+                return nova_cor
+
+    def mover(self, grid_bacterias):
+        self.x += math.cos(self.direcao) * self.velocidade
+        self.y += math.sin(self.direcao) * self.velocidade
+
+        # Impede que a bactéria saia dos limites da área de simulação
+        if self.x < 0:
+            self.x = 0
+            self.direcao = random.uniform(0, math.pi)
+        elif self.x > AREA_SIMULACAO_LARGURA:
+            self.x = AREA_SIMULACAO_LARGURA
+            self.direcao = random.uniform(math.pi, 2 * math.pi)
+        if self.y < 0:
+            self.y = 0
+            self.direcao = random.uniform(math.pi/2, 3*math.pi/2)
+        elif self.y > ALTURA:
+            self.y = ALTURA
+            self.direcao = random.choice([random.uniform(-math.pi/2, 0), random.uniform(0, math.pi/2)])
+
+        self.verificar_colisao_repelir(grid_bacterias)
+        self.energia -= ENERGY_COST_MOVE
+        self.idade += 1
+
+        if self.idade >= self.esperanca_vida:
+            self.energia = 0
+
+        # Se inteligente, usa memória ou segue o gradiente de pheromônios
+        if self.inteligencia:
+            if self.memoria is not None:
+                self.direcao = math.atan2(self.memoria[1] - self.y, self.memoria[0] - self.x)
+            else:
+                cell_x = int(self.x) // CELL_SIZE
+                cell_y = int(self.y) // CELL_SIZE
+                current_phero = pheromone_map[cell_x][cell_y]
+                best_phero = current_phero
+                best_cell = (cell_x, cell_y)
+                for i in range(max(0, cell_x-1), min(GRID_WIDTH, cell_x+2)):
+                    for j in range(max(0, cell_y-1), min(GRID_HEIGHT, cell_y+2)):
+                        if pheromone_map[i][j] > best_phero:
+                            best_phero = pheromone_map[i][j]
+                            best_cell = (i, j)
+                if best_cell != (cell_x, cell_y):
+                    target_x = best_cell[0] * CELL_SIZE + CELL_SIZE / 2
+                    target_y = best_cell[1] * CELL_SIZE + CELL_SIZE / 2
+                    self.direcao = math.atan2(target_y - self.y, target_x - self.x)
+
+    def verificar_colisao_repelir(self, grid_bacterias):
+        cell_x = int(self.x) // CELL_SIZE
+        cell_y = int(self.y) // CELL_SIZE
+        organismos_proximos = []
+        for i in range(max(0, cell_x - 1), min(GRID_WIDTH, cell_x + 2)):
+            for j in range(max(0, cell_y - 1), min(GRID_HEIGHT, cell_y + 2)):
+                organismos_proximos.extend(grid_bacterias[i][j])
+        for organismo in organismos_proximos:
+            if organismo is self:
+                continue
+            dx = self.x - organismo.x
+            dy = self.y - organismo.y
+            distancia = math.hypot(dx, dy)
+            raio_soma = self.tamanho + organismo.tamanho
+            if distancia < raio_soma:
+                forca_repusao = (raio_soma - distancia) * REPULSION_FACTOR
+                angulo = math.atan2(dy, dx)
+                self.x += math.cos(angulo) * forca_repusao
+                self.y += math.sin(angulo) * forca_repusao
+
+    def desenhar(self):
+        pygame.draw.circle(TELA, self.cor, (int(self.x), int(self.y)), self.tamanho)
+
+    def reproduzir(self):
+        if self.energia > BACTERIA_REPRODUCTION_THRESHOLD and len(bacterias) < MAX_BACTERIAS:
+            self.energia /= 2
+            novo_x = min(max(self.x + random.randint(-5, 5), 0), AREA_SIMULACAO_LARGURA)
+            novo_y = min(max(self.y + random.randint(-5, 5), 0), ALTURA)
+            filho = Bacteria(novo_x, novo_y, self.genes, self.presa)
+            filho.mutar()
+            bacterias.append(filho)
+
+    def mutar(self):
+        global CHANCE_MUTACAO
+        if random.random() < CHANCE_MUTACAO:
+            gene_a_mutar = random.choice(list(self.genes.keys()))
+            if gene_a_mutar in ['velocidade', 'defesa', 'ataque']:
+                self.genes[gene_a_mutar] += random.uniform(-SPEED_MUTATION_DELTA, SPEED_MUTATION_DELTA)
+                self.genes[gene_a_mutar] = max(0.1, self.genes[gene_a_mutar])
+            elif gene_a_mutar == 'tamanho':
+                self.genes['tamanho'] += random.randint(-SIZE_MUTATION_DELTA, SIZE_MUTATION_DELTA)
+                self.genes['tamanho'] = max(2, min(self.genes['tamanho'], 12))
+            elif gene_a_mutar == 'inteligencia':
+                if random.random() < CHANCE_MUTACAO_INTELIGENCIA:
+                    self.genes['inteligencia'] = not self.genes['inteligencia']
+            elif gene_a_mutar == 'especie':
+                self.genes['especie'] = f'especie_{uuid.uuid4()}'
+                self.especie = self.genes['especie']
+                self.presa = escolher_presa(self.especie)
+            elif gene_a_mutar == 'esperanca_vida':
+                self.genes['esperanca_vida'] += random.randint(-LIFE_EXPECTANCY_MUTATION_DELTA, LIFE_EXPECTANCY_MUTATION_DELTA)
+                self.genes['esperanca_vida'] = max(500, self.genes['esperanca_vida'])
+            self.aplicar_genes()
+            if self.especie not in cores_especies:
+                cores_especies[self.especie] = self.gerar_cor_unica()
+            self.cor = cores_especies[self.especie]
+
+    def comer(self, grid_bacterias, grid_algas, grid_carcacas):
+        if self.presa == 'alga':
+            alvo_mais_proximo = None
+            menor_distancia = float('inf')
+            cell_x = int(self.x) // CELL_SIZE
+            cell_y = int(self.y) // CELL_SIZE
+            organismos_proximos = []
+            for i in range(max(0, cell_x - 2), min(GRID_WIDTH, cell_x + 3)):
+                for j in range(max(0, cell_y - 2), min(GRID_HEIGHT, cell_y + 3)):
+                    organismos_proximos.extend(grid_algas[i][j])
+            for alga in organismos_proximos:
+                dx = self.x - alga.x
+                dy = self.y - alga.y
+                distancia = math.hypot(dx, dy)
+                if distancia < menor_distancia and distancia < RAIO_DETECAO:
+                    menor_distancia = distancia
+                    alvo_mais_proximo = alga
+            if alvo_mais_proximo:
+                self.direcao = math.atan2(alvo_mais_proximo.y - self.y, alvo_mais_proximo.x - self.x)
+                self.memoria = (alvo_mais_proximo.x, alvo_mais_proximo.y)
+                if menor_distancia < (self.tamanho + alvo_mais_proximo.tamanho):
+                    if alvo_mais_proximo in algas:
+                        algas.remove(alvo_mais_proximo)
+                    self.energia += ENERGY_GAIN_ALGA
+                    cell_px = int(self.x) // CELL_SIZE
+                    cell_py = int(self.y) // CELL_SIZE
+                    pheromone_map[cell_px][cell_py] += PHEROMONE_BOOST
+                else:
+                    self.energia -= ENERGY_LOSS_NO_PREY
+            else:
+                self.energia -= ENERGY_LOSS_NO_PREY
+
+        elif self.presa == 'carcaca':
+            alvo_mais_proximo = None
+            menor_distancia = float('inf')
+            cell_x = int(self.x) // CELL_SIZE
+            cell_y = int(self.y) // CELL_SIZE
+            organismos_proximos = []
+            for i in range(max(0, cell_x - 2), min(GRID_WIDTH, cell_x + 3)):
+                for j in range(max(0, cell_y - 2), min(GRID_HEIGHT, cell_y + 3)):
+                    organismos_proximos.extend(grid_carcacas[i][j])
+            for carcaca in organismos_proximos:
+                dx = self.x - carcaca.x
+                dy = self.y - carcaca.y
+                distancia = math.hypot(dx, dy)
+                if distancia < menor_distancia and distancia < RAIO_DETECAO:
+                    menor_distancia = distancia
+                    alvo_mais_proximo = carcaca
+            if alvo_mais_proximo:
+                self.direcao = math.atan2(alvo_mais_proximo.y - self.y, alvo_mais_proximo.x - self.x)
+                self.memoria = (alvo_mais_proximo.x, alvo_mais_proximo.y)
+                if menor_distancia < (self.tamanho + alvo_mais_proximo.tamanho):
+                    if alvo_mais_proximo in carcacas:
+                        self.energia += alvo_mais_proximo.energia
+                        carcacas.remove(alvo_mais_proximo)
+                        cell_px = int(self.x) // CELL_SIZE
+                        cell_py = int(self.y) // CELL_SIZE
+                        pheromone_map[cell_px][cell_py] += PHEROMONE_BOOST
+                else:
+                    self.energia -= ENERGY_LOSS_NO_PREY
+            else:
+                self.energia -= ENERGY_LOSS_NO_PREY
+
+        else:
+            alvo_mais_proximo = None
+            menor_distancia = float('inf')
+            cell_x = int(self.x) // CELL_SIZE
+            cell_y = int(self.y) // CELL_SIZE
+            organismos_proximos = []
+            for i in range(max(0, cell_x - 2), min(GRID_WIDTH, cell_x + 3)):
+                for j in range(max(0, cell_y - 2), min(GRID_HEIGHT, cell_y + 3)):
+                    organismos_proximos.extend(grid_bacterias[i][j])
+            for bacteria in organismos_proximos:
+                if bacteria.especie == self.presa:
+                    dx = self.x - bacteria.x
+                    dy = self.y - bacteria.y
+                    distancia = math.hypot(dx, dy)
+                    if distancia < menor_distancia and distancia < RAIO_DETECAO:
+                        menor_distancia = distancia
+                        alvo_mais_proximo = bacteria
+            if alvo_mais_proximo:
+                self.direcao = math.atan2(alvo_mais_proximo.y - self.y, alvo_mais_proximo.x - self.x)
+                self.memoria = (alvo_mais_proximo.x, alvo_mais_proximo.y)
+                if menor_distancia < (self.tamanho + alvo_mais_proximo.tamanho):
+                    chance_sucesso = self.ataque / (self.ataque + alvo_mais_proximo.defesa)
+                    if random.uniform(0, 1) < chance_sucesso:
+                        if alvo_mais_proximo in bacterias:
+                            bacterias.remove(alvo_mais_proximo)
+                            carcacas.append(Carcaca(alvo_mais_proximo.x, alvo_mais_proximo.y, energia=30))
+                        self.energia += ENERGY_GAIN_BACTERIA
+                        cell_px = int(self.x) // CELL_SIZE
+                        cell_py = int(self.y) // CELL_SIZE
+                        pheromone_map[cell_px][cell_py] += PHEROMONE_BOOST
+                    else:
+                        self.energia -= ENERGY_LOSS_FAILED_ATTACK
+                else:
+                    self.energia -= ENERGY_LOSS_NO_PREY
+            else:
+                self.energia -= ENERGY_LOSS_NO_PREY
+
+# Nova classe: BacteriaCarnivora
+class BacteriaCarnivora(Bacteria):
+    def __init__(self, x, y, genes=None):
+        if genes is None:
+            genes = {
+                'velocidade': random.uniform(1.0, 2.0),
+                'tamanho': random.randint(4, 6),
+                'inteligencia': True,
+                'especie': 'bacteria_carnivora',
+                'esperanca_vida': random.randint(800, 1500),
+                'defesa': random.uniform(0.2, 1.0),
+                'ataque': random.uniform(1.0, 2.0)
+            }
+        super().__init__(x, y, genes, presa='bacteria_base')
+
+class Alga:
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+        self.energia = 100
+        self.tamanho = 3
+        self.cor = (0, 100, 0)  # Verde escuro
+
+    def mover(self):
+        pass  # Algas permanecem estacionárias
+
+    def desenhar(self):
+        pygame.draw.circle(TELA, self.cor, (int(self.x), int(self.y)), self.tamanho)
+
+    def reproduzir(self):
+        if len(algas) < MAX_ALGAS:
+            self.energia /= 2
+            novo_x = min(max(self.x + random.randint(-5, 5), 0), AREA_SIMULACAO_LARGURA)
+            novo_y = min(max(self.y + random.randint(-5, 5), 0), ALTURA)
+            filho = Alga(novo_x, novo_y)
+            algas.append(filho)
+
+    def fotossintese(self):
+        global ciclo_luz
+        cell_x = int(self.x) // CELL_SIZE
+        cell_y = int(self.y) // CELL_SIZE
+        if 0 <= cell_x < GRID_WIDTH and 0 <= cell_y < GRID_HEIGHT:
+            nutrient_factor = environment_nutrient_map[cell_x][cell_y]
+        else:
+            nutrient_factor = 1.0
+        if ciclo_luz == 'dia':
+            self.energia += PHOTOSYNTHESIS_GAIN * nutrient_factor
+            if self.energia > ALGA_REPRODUCTION_THRESHOLD:
+                self.reproduzir()
+        else:
+            self.energia -= ENERGY_LOSS_NO_PREY
+
+# =========================
+# FUNÇÕES VISUAIS
+# =========================
+def draw_gradient_background(surface, rect, color_top, color_bottom):
+    """Desenha um fundo em gradiente no retângulo especificado."""
+    x, y, w, h = rect
+    for i in range(h):
+        ratio = i / h
+        r = int(color_top[0]*(1-ratio) + color_bottom[0]*ratio)
+        g = int(color_top[1]*(1-ratio) + color_bottom[1]*ratio)
+        b = int(color_top[2]*(1-ratio) + color_bottom[2]*ratio)
+        pygame.draw.line(surface, (r, g, b), (x, y+i), (x+w, y+i))
+
+# =========================
+# FUNÇÕES DE ATUALIZAÇÃO E RENDERIZAÇÃO
+# =========================
+fonte = pygame.font.SysFont('Arial', 14)
+
+def inicializar_organismos():
+    # Adiciona uma bactéria base e algumas algas
+    bacterias.append(Bacteria(random.randint(0, AREA_SIMULACAO_LARGURA),
+                               random.randint(0, ALTURA),
+                               presa='alga'))
+    # Adiciona algumas bactérias carnívoras
+    for _ in range(5):
+        bacterias.append(BacteriaCarnivora(random.randint(0, AREA_SIMULACAO_LARGURA),
+                                           random.randint(0, ALTURA)))
+    for _ in range(500):
+        algas.append(Alga(random.randint(0, AREA_SIMULACAO_LARGURA),
+                          random.randint(0, ALTURA)))
+
+inicializar_organismos()
+
+def update_grids():
+    global grid_bacterias, grid_algas, grid_carcacas
+    grid_bacterias = [[[] for _ in range(GRID_HEIGHT)] for _ in range(GRID_WIDTH)]
+    grid_algas = [[[] for _ in range(GRID_HEIGHT)] for _ in range(GRID_WIDTH)]
+    grid_carcacas = [[[] for _ in range(GRID_HEIGHT)] for _ in range(GRID_WIDTH)]
+    for b in bacterias:
+        cell_x = int(b.x) // CELL_SIZE
+        cell_y = int(b.y) // CELL_SIZE
+        if 0 <= cell_x < GRID_WIDTH and 0 <= cell_y < GRID_HEIGHT:
+            grid_bacterias[cell_x][cell_y].append(b)
+    for a in algas:
+        cell_x = int(a.x) // CELL_SIZE
+        cell_y = int(a.y) // CELL_SIZE
+        if 0 <= cell_x < GRID_WIDTH and 0 <= cell_y < GRID_HEIGHT:
+            grid_algas[cell_x][cell_y].append(a)
+    for c in carcacas:
+        cell_x = int(c.x) // CELL_SIZE
+        cell_y = int(c.y) // CELL_SIZE
+        if 0 <= cell_x < GRID_WIDTH and 0 <= cell_y < GRID_HEIGHT:
+            grid_carcacas[cell_x][cell_y].append(c)
+
+def render_environment():
+    """Desenha os contornos e a cor indicativa de nutrientes em cada célula."""
+    for i in range(GRID_WIDTH):
+        for j in range(GRID_HEIGHT):
+            factor = environment_nutrient_map[i][j]
+            color = nutrient_color(factor)
+            rect = pygame.Rect(i * CELL_SIZE, j * CELL_SIZE, CELL_SIZE, CELL_SIZE)
+            pygame.draw.rect(TELA, color, rect, 1)
+
+def render_simulacao():
+    # Desenha o fundo em gradiente na área de simulação
+    draw_gradient_background(TELA, (0, 0, AREA_SIMULACAO_LARGURA, ALTURA), (10, 10, 30), (50, 50, 80))
+    render_environment()
+    for a in algas:
+        a.desenhar()
+    for b in bacterias:
+        b.desenhar()
+    for c in carcacas:
+        c.desenhar()
+    # Desenha as partículas (ex: geradas por desastres)
+    for particle in particles:
+        particle.draw(TELA)
+    # Se for noite, desenha um overlay semi-transparente para criar o efeito de escuridão
+    if ciclo_luz == 'noite':
+        overlay = pygame.Surface((AREA_SIMULACAO_LARGURA, ALTURA))
+        overlay.set_alpha(100)  # Transparência: 0 (invisível) a 255 (opaco)
+        overlay.fill((0, 0, 50))
+        TELA.blit(overlay, (0, 0))
+
+def render_informacoes(tempo):
+    info_x = AREA_SIMULACAO_LARGURA + 10
+    info_y = 10
+    textos = [
+        ('Bactérias:', len(bacterias), (0, 255, 0)),
+        ('Algas:', len(algas), (0, 100, 0)),
+        ('Carcaças:', len(carcacas), (139, 69, 19)),
+        ('Ciclo de Luz:', ciclo_luz.capitalize(), BRANCO),
+        ('Pausado:', 'Sim' if paused else 'Não', BRANCO),
+        ('Taxa Mutação:', f'{CHANCE_MUTACAO:.2f}', BRANCO)
+    ]
+    for label, valor, cor in textos:
+        img = fonte.render(f'{label} {valor}', True, BRANCO)
+        TELA.blit(img, (info_x + 20, info_y))
+        if label not in ['Ciclo de Luz:', 'Pausado:', 'Taxa Mutação:']:
+            pygame.draw.rect(TELA, cor, (info_x, info_y + 5, 10, 10))
+        info_y += 20
+
+    # Estratégias alimentares
+    herbivoros = sum(1 for b in bacterias if b.presa == 'alga')
+    carniceiros = sum(1 for b in bacterias if b.presa == 'carcaca')
+    especies_bacterias = set(b.especie for b in bacterias)
+    predadores = sum(1 for b in bacterias if b.presa in especies_bacterias)
+
+    info_y += 10
+    TELA.blit(fonte.render('Estratégias Alimentares:', True, BRANCO), (info_x, info_y))
+    info_y += 20
+    estrategias = [
+        ('Herbívoros:', herbivoros, (0, 255, 0)),
+        ('Predadores:', predadores, (255, 0, 0)),
+        ('Carniceiros:', carniceiros, (139, 69, 19)),
+    ]
+    for label, quantidade, cor in estrategias:
+        img = fonte.render(f'{label} {quantidade}', True, BRANCO)
+        TELA.blit(img, (info_x + 20, info_y))
+        pygame.draw.rect(TELA, cor, (info_x, info_y + 5, 10, 10))
+        info_y += 20
+
+    # Exibe as espécies (limitado a 20)
+    info_y += 10
+    TELA.blit(fonte.render('Espécies:', True, BRANCO), (info_x, info_y))
+    info_y += 20
+    lista_especies = []
+    for especie, cor in cores_especies.items():
+        quantidade_especie = sum(1 for b in bacterias if b.especie == especie)
+        if quantidade_especie > 0:
+            lista_especies.append((especie, cor, quantidade_especie))
+    lista_especies.sort(key=lambda x: x[2], reverse=True)
+    especies_exibidas = 0
+    for especie, cor, quantidade_especie in lista_especies:
+        if especies_exibidas >= 20:
+            break
+        presa_especie = None
+        for b in bacterias:
+            if b.especie == especie:
+                presa_especie = b.presa
+                break
+        img = fonte.render(f'{especie[:10]} ({presa_especie}): {quantidade_especie}', True, BRANCO)
+        TELA.blit(img, (info_x + 20, info_y))
+        pygame.draw.rect(TELA, cor, (info_x, info_y + 5, 10, 10))
+        info_y += 20
+        especies_exibidas += 1
+
+# =========================
+# EVENTOS AMBIENTAIS: DESASTRE
+# =========================
+def trigger_disaster():
+    """Dispara um desastre que reduz os níveis de nutrientes em uma região aleatória e gera partículas."""
+    region_width = random.randint(2, 4)
+    region_height = random.randint(2, 4)
+    start_x = random.randint(0, GRID_WIDTH - region_width)
+    start_y = random.randint(0, GRID_HEIGHT - region_height)
+    for i in range(start_x, start_x + region_width):
+        for j in range(start_y, start_y + region_height):
+            environment_nutrient_map[i][j] = 0.5
+    # Gera partículas no centro da região afetada
+    center_x = (start_x + region_width/2) * CELL_SIZE
+    center_y = (start_y + region_height/2) * CELL_SIZE
+    for _ in range(50):
+        particles.append(Particle(center_x, center_y))
+    print("Desastre ambiental disparado na região:", start_x, start_y, region_width, region_height)
+
+# =========================
+# EXPORTAÇÃO DOS DADOS DA SIMULAÇÃO
+# =========================
+def export_data():
+    with open("simulation_data.csv", "w", newline="") as csvfile:
+        writer = csv.writer(csvfile)
+        writer.writerow(["Time", "Bacteria Population"])
+        for t, pop in zip(historico_tempo, historico_populacoes):
+            writer.writerow([t, pop])
+    print("Dados exportados para simulation_data.csv")
+
+def plot_results():
+    plt.figure(figsize=(10, 6))
+    plt.plot(historico_tempo, historico_populacoes, label="Bactérias")
+    plt.xlabel("Tempo (ticks)")
+    plt.ylabel("Número de Bactérias")
+    plt.title("Histórico de População de Bactérias")
+    plt.legend()
+    plt.show()
+
+# =========================
+# FUNÇÃO PRINCIPAL DA SIMULAÇÃO
+# =========================
+def main():
+    global ciclo_luz, paused, CHANCE_MUTACAO
+    relogio = pygame.time.Clock()
+    rodando = True
+    tempo = 0
+
+    while rodando:
+        relogio.tick(30)
+        for evento in pygame.event.get():
+            if evento.type == pygame.QUIT:
+                rodando = False
+            elif evento.type == pygame.KEYDOWN:
+                if evento.key == pygame.K_SPACE:
+                    paused = not paused
+                elif evento.key == pygame.K_UP:
+                    CHANCE_MUTACAO = min(CHANCE_MUTACAO + 0.01, 1.0)
+                elif evento.key == pygame.K_DOWN:
+                    CHANCE_MUTACAO = max(CHANCE_MUTACAO - 0.01, 0.0)
+                elif evento.key == pygame.K_d:
+                    trigger_disaster()
+
+        if not paused:
+            tempo += 1
+
+            # Alterna o ciclo de luz
+            if tempo % DURACAO_CICLO == 0:
+                ciclo_luz = 'noite' if ciclo_luz == 'dia' else 'dia'
+                if ciclo_luz == 'dia' and len(algas) == 0:
+                    for _ in range(100):
+                        algas.append(Alga(random.randint(0, AREA_SIMULACAO_LARGURA),
+                                          random.randint(0, ALTURA)))
+
+            update_grids()
+            update_pheromones()
+
+            # Atualiza as partículas e remove as que já morreram
+            for particle in particles[:]:
+                particle.update()
+                if particle.life <= 0:
+                    particles.remove(particle)
+
+            # Atualiza as algas
+            for alga in algas[:]:
+                alga.fotossintese()
+                alga.mover()
+                if alga.energia <= 0:
+                    algas.remove(alga)
+
+            # Atualiza as bactérias
+            for bacteria in bacterias[:]:
+                bacteria.comer(grid_bacterias, grid_algas, grid_carcacas)
+                bacteria.mover(grid_bacterias)
+                bacteria.reproduzir()
+                if bacteria.energia <= 0:
+                    bacterias.remove(bacteria)
+                    carcacas.append(Carcaca(bacteria.x, bacteria.y, energia=30))
+
+            if len(bacterias) == 0:
+                bacterias.append(Bacteria(random.randint(0, AREA_SIMULACAO_LARGURA),
+                                           random.randint(0, ALTURA),
+                                           presa='alga'))
+
+            historico_tempo.append(tempo)
+            historico_populacoes.append(len(bacterias))
+
+        render_simulacao()
+        render_informacoes(tempo)
+        pygame.display.flip()
+
+    pygame.quit()
+    export_data()
+    plot_results()
+
+if __name__ == '__main__':
+    main()
