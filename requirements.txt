@@ -1,9 +1,1 @@
-
-simulacaomicrobiana/
-├── main.py
-├── mundo.py
-├── organismos.py
-├── ambiente.py
-├── quadtree.py
-├── configuracoes.py
-└── requirements.txt
+pygame==2.6.1
