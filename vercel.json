@@ -2,6 +2,6 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": null,
   "installCommand": "echo 'Dependencies will be managed by uv during build'",
-  "buildCommand": "uv run --no-project --with-requirements requirements.txt python -m pygbag --build --ume_block 0 .",
+  "buildCommand": "uv run --no-project --with-requirements requirements.txt python -m py_compile configuracoes.py ambiente.py organismos.py quadtree.py mundo.py main.py && uv run --no-project --with-requirements requirements.txt python -c \"from mundo import Mundo; mundo = Mundo(); mundo.atualizar(); print(mundo.obter_estatisticas())\" && uv run --no-project --with-requirements requirements.txt python -m pygbag --build --ume_block 0 .",
   "outputDirectory": "build/web"
 }
