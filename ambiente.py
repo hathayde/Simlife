@@ -1,4 +1,3 @@
-```python
 # ambiente.py
 from __future__ import annotations
 
@@ -609,4 +608,3 @@ def atualizar_ambiente_padrao(
     """
 
     _ambiente_padrao.atualizar(passos)
-```
