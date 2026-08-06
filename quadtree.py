@@ -1,4 +1,3 @@
-```python
 # quadtree.py
 from __future__ import annotations
 
@@ -557,4 +556,3 @@ class Quadtree:
             f"divided={self.divided}"
             ")"
         )
-```
