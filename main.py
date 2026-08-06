@@ -14,33 +14,50 @@ from configuracoes import (
     ALTURA,
     AREA_SIMULACAO_LARGURA,
     BRANCO,
-    CINZA_ESCURO,
+    CORES_ESTRATEGIAS,
+    COR_DESTAQUE_SELECAO,
+    COR_GRAFICO_FOTOSSINTETICAS,
+    COR_GRAFICO_NECROFAGAS,
+    COR_GRAFICO_PREDADORAS,
+    DURACAO_MENSAGEM_INTERFACE,
+    ESTRATEGIA_FOTOSSINTESE,
+    ESTRATEGIA_NECROFAGIA,
+    ESTRATEGIA_PREDACAO,
     FPS,
     LARGURA,
+    MARGEM_SELECAO_ORGANISMO,
+    NOMES_ESTRATEGIAS,
     PRETO,
+    RAIO_MINIMO_SELECAO,
+    TAMANHO_HISTORICO,
+    TITULO_JANELA,
 )
 from mundo import Mundo
+from organismos import Bacteria, Carcaca
 
 
 # ============================================================
 # CORES DA INTERFACE
 # ============================================================
 
-COR_PAINEL = (25, 31, 38)
-COR_PAINEL_SECUNDARIA = (34, 42, 51)
+COR_PAINEL = (24, 30, 37)
+COR_PAINEL_SECUNDARIO = (34, 42, 51)
+COR_PAINEL_TERCIARIO = (20, 26, 32)
 
 COR_BOTAO = (48, 58, 69)
 COR_BOTAO_HOVER = (61, 73, 86)
 COR_BOTAO_ATIVO = (34, 139, 94)
 COR_BOTAO_BORDA = (88, 101, 114)
 
-COR_TEXTO_SECUNDARIO = (175, 185, 195)
-COR_DESTAQUE = (255, 215, 70)
-COR_ERRO = (190, 55, 55)
+COR_TEXTO_SECUNDARIO = (170, 182, 194)
+COR_TEXTO_DISCRETO = (125, 138, 151)
 
-COR_GRAFICO_BACTERIAS = (0, 255, 100)
-COR_GRAFICO_ALGAS = (0, 160, 40)
-COR_GRAFICO_PROTOZOARIOS = (255, 90, 90)
+COR_BORDA = (72, 84, 96)
+COR_GRADE_GRAFICO = (42, 51, 61)
+
+COR_ERRO = (200, 65, 70)
+COR_SUCESSO = (65, 190, 120)
+COR_ALERTA = (245, 190, 70)
 
 
 # ============================================================
@@ -63,7 +80,9 @@ class Botao:
         self,
         posicao: tuple[int, int],
     ) -> bool:
-        return self.retangulo.collidepoint(posicao)
+        return self.retangulo.collidepoint(
+            posicao
+        )
 
 
 # ============================================================
@@ -72,51 +91,53 @@ class Botao:
 
 class Aplicacao:
     """
-    Controla a janela, os eventos, a interface e a renderização.
+    Controla a janela, os eventos e a interface da simulação.
 
-    A lógica ecológica continua centralizada em Mundo.
+    A lógica ecológica permanece centralizada em Mundo.
     """
 
     def __init__(self) -> None:
         pygame.init()
 
         self.tela = pygame.display.set_mode(
-            (LARGURA, ALTURA)
+            (
+                LARGURA,
+                ALTURA,
+            )
         )
 
         pygame.display.set_caption(
-            "SimLife — Evolução Microbiana"
+            TITULO_JANELA
         )
 
         self.relogio = pygame.time.Clock()
 
-        # Fontes internas são mais seguras no WebAssembly.
+        # Fontes internas do Pygame são mais compatíveis com Pygbag.
         self.fonte_pequena = pygame.font.Font(
             None,
-            18,
+            17,
         )
 
         self.fonte = pygame.font.Font(
             None,
-            21,
+            20,
         )
 
         self.fonte_media = pygame.font.Font(
             None,
-            24,
+            23,
         )
 
         self.fonte_titulo = pygame.font.Font(
             None,
-            30,
+            29,
         )
 
         self.fonte_grande = pygame.font.Font(
             None,
-            38,
+            40,
         )
 
-        # Inicializado após o primeiro frame para o Pygbag.
         self.mundo: Mundo | None = None
 
         self.rodando = True
@@ -126,29 +147,41 @@ class Aplicacao:
         self.velocidade_simulacao = 1
         self.frame = 0
 
-        # Ferramentas disponíveis:
+        # Ferramentas:
         # - inspecionar
-        # - adicionar_alga
-        # - adicionar_bacteria
-        self.ferramenta_atual = "inspecionar"
+        # - adicionar_fotossintetica
+        # - adicionar_predadora
+        # - adicionar_necrofaga
+        self.ferramenta_atual = (
+            "inspecionar"
+        )
 
-        self.organismo_selecionado: Any | None = None
+        self.organismo_selecionado: (
+            Bacteria
+            | Carcaca
+            | None
+        ) = None
 
         self.mensagem_temporaria = ""
+        self.cor_mensagem_temporaria = BRANCO
         self.tempo_mensagem_temporaria = 0
 
-        tamanho_historico = 300
-
-        self.historico_bacterias: deque[int] = deque(
-            maxlen=tamanho_historico
+        self.historico_fotossinteticas: deque[
+            int
+        ] = deque(
+            maxlen=TAMANHO_HISTORICO
         )
 
-        self.historico_algas: deque[int] = deque(
-            maxlen=tamanho_historico
+        self.historico_predadoras: deque[
+            int
+        ] = deque(
+            maxlen=TAMANHO_HISTORICO
         )
 
-        self.historico_protozoarios: deque[int] = deque(
-            maxlen=tamanho_historico
+        self.historico_necrofagas: deque[
+            int
+        ] = deque(
+            maxlen=TAMANHO_HISTORICO
         )
 
         self.botoes: list[Botao] = []
@@ -165,27 +198,35 @@ class Aplicacao:
         """
 
         self.desenhar_tela_inicial(
-            "Inicializando SimLife..."
+            "Inicializando ecossistema..."
         )
 
         pygame.display.flip()
 
-        # Libera o navegador antes da inicialização do mundo.
+        # Libera o navegador antes de construir o mundo.
         await asyncio.sleep(0)
 
         try:
             self.mundo = Mundo()
 
         except Exception as erro:
-            print("ERRO AO CRIAR O MUNDO:")
-            print(repr(erro))
+            print(
+                "ERRO AO CRIAR O MUNDO:"
+            )
+            print(
+                repr(erro)
+            )
 
             await self.manter_tela_de_erro(
-                titulo="Erro ao inicializar a simulação.",
+                titulo=(
+                    "Erro ao inicializar a simulação."
+                ),
                 detalhe=repr(erro),
             )
 
             return
+
+        self.registrar_historico()
 
         while self.rodando:
             self.processar_eventos()
@@ -205,8 +246,12 @@ class Aplicacao:
                     self.registrar_historico()
 
                 except Exception as erro:
-                    print("ERRO DURANTE A SIMULAÇÃO:")
-                    print(repr(erro))
+                    print(
+                        "ERRO DURANTE A SIMULAÇÃO:"
+                    )
+                    print(
+                        repr(erro)
+                    )
 
                     await self.manter_tela_de_erro(
                         titulo=(
@@ -223,9 +268,11 @@ class Aplicacao:
             pygame.display.flip()
 
             if sys.platform != "emscripten":
-                self.relogio.tick(FPS)
+                self.relogio.tick(
+                    FPS
+                )
 
-            # Obrigatório para execução no Pygbag.
+            # Obrigatório para o Pygbag.
             await asyncio.sleep(0)
 
         if sys.platform != "emscripten":
@@ -260,28 +307,34 @@ class Aplicacao:
 
     def criar_botoes(self) -> None:
         """
-        Cria os botões clicáveis do painel lateral.
+        Cria todos os botões do painel lateral.
         """
 
         self.botoes.clear()
 
         painel_x = AREA_SIMULACAO_LARGURA
-        margem = 16
+        margem = 14
 
         x = painel_x + margem
+
         largura_disponivel = (
             LARGURA
             - painel_x
             - margem * 2
         )
 
-        # Linha principal.
         espacamento = 8
-        largura_principal = (
-            largura_disponivel - espacamento * 2
-        ) // 3
 
-        y = 52
+        # ----------------------------------------------------
+        # CONTROLES PRINCIPAIS
+        # ----------------------------------------------------
+
+        y = 48
+
+        largura_controle = (
+            largura_disponivel
+            - espacamento * 2
+        ) // 3
 
         self.botoes.extend(
             [
@@ -291,7 +344,7 @@ class Aplicacao:
                     retangulo=pygame.Rect(
                         x,
                         y,
-                        largura_principal,
+                        largura_controle,
                         34,
                     ),
                     acao=self.alternar_pausa,
@@ -301,10 +354,10 @@ class Aplicacao:
                     rotulo="Reiniciar",
                     retangulo=pygame.Rect(
                         x
-                        + largura_principal
+                        + largura_controle
                         + espacamento,
                         y,
-                        largura_principal,
+                        largura_controle,
                         34,
                     ),
                     acao=self.reiniciar,
@@ -315,12 +368,12 @@ class Aplicacao:
                     retangulo=pygame.Rect(
                         x
                         + (
-                            largura_principal
+                            largura_controle
                             + espacamento
                         )
                         * 2,
                         y,
-                        largura_principal,
+                        largura_controle,
                         34,
                     ),
                     acao=self.alternar_ajuda,
@@ -328,15 +381,24 @@ class Aplicacao:
             ]
         )
 
-        # Velocidades.
-        y = 116
+        # ----------------------------------------------------
+        # VELOCIDADES
+        # ----------------------------------------------------
+
+        y = 108
 
         largura_velocidade = (
-            largura_disponivel - espacamento * 3
+            largura_disponivel
+            - espacamento * 3
         ) // 4
 
         for indice, velocidade in enumerate(
-            (1, 2, 4, 8)
+            (
+                1,
+                2,
+                4,
+                8,
+            )
         ):
             self.botoes.append(
                 Botao(
@@ -353,37 +415,47 @@ class Aplicacao:
                         ),
                         y,
                         largura_velocidade,
-                        31,
+                        30,
                     ),
                     acao=(
                         lambda valor=velocidade:
-                        self.definir_velocidade(valor)
+                        self.definir_velocidade(
+                            valor
+                        )
                     ),
                     grupo="velocidade",
                 )
             )
 
-        # Ferramentas.
-        y = 178
+        # ----------------------------------------------------
+        # FERRAMENTAS
+        # ----------------------------------------------------
+
+        y = 162
 
         largura_ferramenta = (
-            largura_disponivel - espacamento * 2
-        ) // 3
+            largura_disponivel
+            - espacamento * 3
+        ) // 4
 
-        ferramentas = [
+        ferramentas = (
             (
                 "inspecionar",
-                "Inspecionar",
+                "Inspec.",
             ),
             (
-                "adicionar_alga",
-                "+ Alga",
+                "adicionar_fotossintetica",
+                "Foto",
             ),
             (
-                "adicionar_bacteria",
-                "+ Bactéria",
+                "adicionar_predadora",
+                "Pred.",
             ),
-        ]
+            (
+                "adicionar_necrofaga",
+                "Necróf.",
+            ),
+        )
 
         for indice, (
             identificador,
@@ -402,7 +474,7 @@ class Aplicacao:
                         ),
                         y,
                         largura_ferramenta,
-                        31,
+                        30,
                     ),
                     acao=(
                         lambda ferramenta=identificador:
@@ -419,11 +491,14 @@ class Aplicacao:
 
         if self.pausado:
             self.definir_mensagem(
-                "Simulação pausada."
+                "Simulação pausada.",
+                COR_ALERTA,
             )
+
         else:
             self.definir_mensagem(
-                "Simulação retomada."
+                "Simulação retomada.",
+                COR_SUCESSO,
             )
 
     def alternar_ajuda(self) -> None:
@@ -435,10 +510,16 @@ class Aplicacao:
         self,
         velocidade: int,
     ) -> None:
-        self.velocidade_simulacao = velocidade
+        self.velocidade_simulacao = (
+            velocidade
+        )
 
         self.definir_mensagem(
-            f"Velocidade alterada para {velocidade}x."
+            (
+                "Velocidade alterada para "
+                f"{velocidade}x."
+            ),
+            COR_SUCESSO,
         )
 
     def definir_ferramenta(
@@ -449,13 +530,19 @@ class Aplicacao:
 
         mensagens = {
             "inspecionar": (
-                "Clique em um organismo para inspecioná-lo."
+                "Clique em uma bactéria ou carcaça."
             ),
-            "adicionar_alga": (
-                "Clique na simulação para adicionar uma alga."
+            "adicionar_fotossintetica": (
+                "Clique no mapa para adicionar "
+                "uma bactéria fotossintética."
             ),
-            "adicionar_bacteria": (
-                "Clique na simulação para adicionar uma bactéria."
+            "adicionar_predadora": (
+                "Clique no mapa para adicionar "
+                "uma bactéria predadora."
+            ),
+            "adicionar_necrofaga": (
+                "Clique no mapa para adicionar "
+                "uma bactéria necrófaga."
             ),
         }
 
@@ -492,8 +579,14 @@ class Aplicacao:
 
             elif evento.type == pygame.FINGERDOWN:
                 posicao = (
-                    int(evento.x * LARGURA),
-                    int(evento.y * ALTURA),
+                    int(
+                        evento.x
+                        * LARGURA
+                    ),
+                    int(
+                        evento.y
+                        * ALTURA
+                    ),
                 )
 
                 self.processar_clique(
@@ -512,7 +605,11 @@ class Aplicacao:
         if tecla == pygame.K_ESCAPE:
             if self.exibir_ajuda:
                 self.exibir_ajuda = False
-            else:
+
+            elif (
+                self.organismo_selecionado
+                is not None
+            ):
                 self.organismo_selecionado = None
 
         elif tecla == pygame.K_SPACE:
@@ -529,14 +626,39 @@ class Aplicacao:
                 "inspecionar"
             )
 
-        elif tecla == pygame.K_a:
+        elif tecla == pygame.K_f:
             self.definir_ferramenta(
-                "adicionar_alga"
+                "adicionar_fotossintetica"
             )
 
-        elif tecla == pygame.K_b:
+        elif tecla == pygame.K_p:
             self.definir_ferramenta(
-                "adicionar_bacteria"
+                "adicionar_predadora"
+            )
+
+        elif tecla == pygame.K_n:
+            self.definir_ferramenta(
+                "adicionar_necrofaga"
+            )
+
+        elif tecla == pygame.K_1:
+            self.definir_velocidade(
+                1
+            )
+
+        elif tecla == pygame.K_2:
+            self.definir_velocidade(
+                2
+            )
+
+        elif tecla == pygame.K_3:
+            self.definir_velocidade(
+                4
+            )
+
+        elif tecla == pygame.K_4:
+            self.definir_velocidade(
+                8
             )
 
         elif tecla in (
@@ -544,69 +666,59 @@ class Aplicacao:
             pygame.K_KP_PLUS,
             pygame.K_EQUALS,
         ):
-            velocidades = [
-                1,
-                2,
-                4,
-                8,
-            ]
-
-            atual = (
-                self.velocidade_simulacao
-            )
-
-            proxima = next(
-                (
-                    valor
-                    for valor in velocidades
-                    if valor > atual
-                ),
-                8,
-            )
-
-            self.definir_velocidade(
-                proxima
-            )
+            self.aumentar_velocidade()
 
         elif tecla in (
             pygame.K_MINUS,
             pygame.K_KP_MINUS,
         ):
-            velocidades = [
-                8,
-                4,
-                2,
-                1,
-            ]
+            self.reduzir_velocidade()
 
-            atual = (
-                self.velocidade_simulacao
-            )
+    def aumentar_velocidade(self) -> None:
+        velocidades = (
+            1,
+            2,
+            4,
+            8,
+        )
 
-            proxima = next(
-                (
-                    valor
-                    for valor in velocidades
-                    if valor < atual
-                ),
-                1,
-            )
+        for velocidade in velocidades:
+            if (
+                velocidade
+                > self.velocidade_simulacao
+            ):
+                self.definir_velocidade(
+                    velocidade
+                )
 
-            self.definir_velocidade(
-                proxima
-            )
+                return
 
-        elif tecla == pygame.K_1:
-            self.definir_velocidade(1)
+        self.definir_velocidade(
+            8
+        )
 
-        elif tecla == pygame.K_2:
-            self.definir_velocidade(2)
+    def reduzir_velocidade(self) -> None:
+        velocidades = (
+            8,
+            4,
+            2,
+            1,
+        )
 
-        elif tecla == pygame.K_3:
-            self.definir_velocidade(4)
+        for velocidade in velocidades:
+            if (
+                velocidade
+                < self.velocidade_simulacao
+            ):
+                self.definir_velocidade(
+                    velocidade
+                )
 
-        elif tecla == pygame.K_4:
-            self.definir_velocidade(8)
+                return
+
+        self.definir_velocidade(
+            1
+        )
 
     def processar_clique(
         self,
@@ -614,16 +726,17 @@ class Aplicacao:
         botao_mouse: int,
     ) -> None:
         """
-        Processa cliques nos controles ou na simulação.
+        Processa cliques nos controles e no ecossistema.
         """
 
         if self.exibir_ajuda:
             self.exibir_ajuda = False
             return
 
-        # Primeiro tenta acionar um botão do painel.
         for botao in self.botoes:
-            if botao.contem(posicao):
+            if botao.contem(
+                posicao
+            ):
                 botao.acao()
                 return
 
@@ -637,43 +750,33 @@ class Aplicacao:
 
         x, y = posicao
 
-        # Clique direito mantém o atalho tradicional.
+        # Clique direito sempre funciona como inspeção rápida.
         if botao_mouse == 3:
-            adicionado = (
-                self.mundo.adicionar_bacteria_na_posicao(
-                    x,
-                    y,
-                )
-            )
-
-            self.informar_resultado_adicao(
-                adicionado=adicionado,
-                nome="Bactéria",
-            )
-
-            return
-
-        if self.ferramenta_atual == "adicionar_alga":
-            adicionado = (
-                self.mundo.adicionar_alga_na_posicao(
-                    x,
-                    y,
-                )
-            )
-
-            self.informar_resultado_adicao(
-                adicionado=adicionado,
-                nome="Alga",
+            self.selecionar_organismo(
+                x,
+                y,
             )
 
             return
 
         if (
             self.ferramenta_atual
-            == "adicionar_bacteria"
+            == "inspecionar"
+        ):
+            self.selecionar_organismo(
+                x,
+                y,
+            )
+
+            return
+
+        if (
+            self.ferramenta_atual
+            == "adicionar_fotossintetica"
         ):
             adicionado = (
-                self.mundo.adicionar_bacteria_na_posicao(
+                self.mundo
+                .adicionar_fotossintetica_na_posicao(
                     x,
                     y,
                 )
@@ -681,15 +784,52 @@ class Aplicacao:
 
             self.informar_resultado_adicao(
                 adicionado=adicionado,
-                nome="Bactéria",
+                nome=(
+                    "Bactéria fotossintética"
+                ),
             )
 
             return
 
-        self.selecionar_organismo(
-            x,
-            y,
-        )
+        if (
+            self.ferramenta_atual
+            == "adicionar_predadora"
+        ):
+            adicionado = (
+                self.mundo
+                .adicionar_predadora_na_posicao(
+                    x,
+                    y,
+                )
+            )
+
+            self.informar_resultado_adicao(
+                adicionado=adicionado,
+                nome=(
+                    "Bactéria predadora"
+                ),
+            )
+
+            return
+
+        if (
+            self.ferramenta_atual
+            == "adicionar_necrofaga"
+        ):
+            adicionado = (
+                self.mundo
+                .adicionar_necrofaga_na_posicao(
+                    x,
+                    y,
+                )
+            )
+
+            self.informar_resultado_adicao(
+                adicionado=adicionado,
+                nome=(
+                    "Bactéria necrófaga"
+                ),
+            )
 
     def informar_resultado_adicao(
         self,
@@ -698,11 +838,17 @@ class Aplicacao:
     ) -> None:
         if adicionado:
             self.definir_mensagem(
-                f"{nome} adicionada com sucesso."
+                f"{nome} adicionada.",
+                COR_SUCESSO,
             )
+
         else:
             self.definir_mensagem(
-                f"Limite de {nome.lower()}s atingido."
+                (
+                    "Limite populacional "
+                    "atingido."
+                ),
+                COR_ERRO,
             )
 
     def posicao_dentro_da_simulacao(
@@ -712,12 +858,13 @@ class Aplicacao:
         x, y = posicao
 
         return (
-            0 <= x < AREA_SIMULACAO_LARGURA
+            0 <= x
+            < AREA_SIMULACAO_LARGURA
             and 0 <= y < ALTURA
         )
 
     # ========================================================
-    # SELEÇÃO E INSPEÇÃO
+    # SELEÇÃO
     # ========================================================
 
     def selecionar_organismo(
@@ -726,48 +873,60 @@ class Aplicacao:
         y: float,
     ) -> None:
         """
-        Seleciona o organismo mais próximo do clique.
+        Seleciona a entidade mais próxima do clique.
         """
 
         if self.mundo is None:
             return
 
         organismos = (
-            list(self.mundo.bacterias)
-            + list(self.mundo.protozoarios)
-            + list(self.mundo.algas)
-            + list(self.mundo.carcacas)
+            self.mundo.obter_organismos()
         )
 
-        melhor_organismo = None
-        menor_distancia = float("inf")
+        melhor_organismo: (
+            Bacteria
+            | Carcaca
+            | None
+        ) = None
+
+        menor_distancia_quadrada = (
+            float("inf")
+        )
 
         for organismo in organismos:
             dx = organismo.x - x
             dy = organismo.y - y
 
-            distancia = math.sqrt(
-                dx * dx + dy * dy
+            distancia_quadrada = (
+                dx * dx
+                + dy * dy
+            )
+
+            tamanho = float(
+                getattr(
+                    organismo,
+                    "tamanho",
+                    3,
+                )
             )
 
             raio_selecao = max(
-                12.0,
-                float(
-                    getattr(
-                        organismo,
-                        "tamanho",
-                        3,
-                    )
-                )
-                + 8.0,
+                RAIO_MINIMO_SELECAO,
+                tamanho
+                + MARGEM_SELECAO_ORGANISMO,
             )
 
             if (
-                distancia <= raio_selecao
-                and distancia < menor_distancia
+                distancia_quadrada
+                <= raio_selecao
+                * raio_selecao
+                and distancia_quadrada
+                < menor_distancia_quadrada
             ):
                 melhor_organismo = organismo
-                menor_distancia = distancia
+                menor_distancia_quadrada = (
+                    distancia_quadrada
+                )
 
         self.organismo_selecionado = (
             melhor_organismo
@@ -775,59 +934,67 @@ class Aplicacao:
 
         if melhor_organismo is None:
             self.definir_mensagem(
-                "Nenhum organismo encontrado."
-            )
-        else:
-            nome = self.obter_nome_organismo(
-                melhor_organismo
+                "Nenhuma entidade encontrada."
             )
 
-            self.definir_mensagem(
-                f"{nome} selecionado."
-            )
+            return
+
+        nome = self.obter_nome_organismo(
+            melhor_organismo
+        )
+
+        self.definir_mensagem(
+            f"{nome} selecionada.",
+            COR_SUCESSO,
+        )
 
     def validar_selecao(self) -> None:
         """
-        Remove a seleção quando o organismo deixa de existir.
+        Remove a seleção quando a entidade deixa de existir.
         """
 
         if (
-            self.organismo_selecionado is None
+            self.organismo_selecionado
+            is None
             or self.mundo is None
         ):
             return
 
-        organismo = self.organismo_selecionado
-
-        organismos_ativos = (
-            list(self.mundo.bacterias)
-            + list(self.mundo.algas)
-            + list(self.mundo.protozoarios)
-            + list(self.mundo.carcacas)
+        entidades_ativas = (
+            self.mundo.obter_organismos()
         )
 
-        if organismo not in organismos_ativos:
+        if (
+            self.organismo_selecionado
+            not in entidades_ativas
+        ):
             self.organismo_selecionado = None
 
             self.definir_mensagem(
-                "O organismo selecionado deixou de existir."
+                (
+                    "A entidade selecionada "
+                    "deixou de existir."
+                ),
+                COR_ALERTA,
             )
 
     @staticmethod
     def obter_nome_organismo(
         organismo: Any,
     ) -> str:
-        nomes = {
-            "Bacteria": "Bactéria",
-            "Alga": "Alga",
-            "Protozoario": "Protozoário",
-            "Carcaca": "Carcaça",
-        }
+        if isinstance(
+            organismo,
+            Bacteria,
+        ):
+            return "Bactéria"
 
-        return nomes.get(
-            organismo.__class__.__name__,
-            organismo.__class__.__name__,
-        )
+        if isinstance(
+            organismo,
+            Carcaca,
+        ):
+            return "Carcaça"
+
+        return organismo.__class__.__name__
 
     # ========================================================
     # CONTROLE DO MUNDO
@@ -835,18 +1002,23 @@ class Aplicacao:
 
     def reiniciar(self) -> None:
         """
-        Recria completamente o mundo da simulação.
+        Recria completamente o ecossistema.
         """
 
         try:
             self.mundo = Mundo()
 
         except Exception as erro:
-            print("ERRO AO REINICIAR O MUNDO:")
-            print(repr(erro))
+            print(
+                "ERRO AO REINICIAR:"
+            )
+            print(
+                repr(erro)
+            )
 
             self.definir_mensagem(
-                "Não foi possível reiniciar."
+                "Não foi possível reiniciar.",
+                COR_ERRO,
             )
 
             return
@@ -855,17 +1027,20 @@ class Aplicacao:
         self.pausado = False
         self.organismo_selecionado = None
 
-        self.historico_bacterias.clear()
-        self.historico_algas.clear()
-        self.historico_protozoarios.clear()
+        self.historico_fotossinteticas.clear()
+        self.historico_predadoras.clear()
+        self.historico_necrofagas.clear()
+
+        self.registrar_historico()
 
         self.definir_mensagem(
-            "Simulação reiniciada."
+            "Ecossistema reiniciado.",
+            COR_SUCESSO,
         )
 
     def registrar_historico(self) -> None:
         """
-        Registra populações para o gráfico lateral.
+        Registra a população de cada estratégia.
         """
 
         if self.mundo is None:
@@ -875,16 +1050,22 @@ class Aplicacao:
             self.mundo.obter_estatisticas()
         )
 
-        self.historico_bacterias.append(
-            estatisticas["bacterias"]
+        self.historico_fotossinteticas.append(
+            estatisticas[
+                "fotossinteticas"
+            ]
         )
 
-        self.historico_algas.append(
-            estatisticas["algas"]
+        self.historico_predadoras.append(
+            estatisticas[
+                "predadoras"
+            ]
         )
 
-        self.historico_protozoarios.append(
-            estatisticas["protozoarios"]
+        self.historico_necrofagas.append(
+            estatisticas[
+                "necrofagas"
+            ]
         )
 
     # ========================================================
@@ -894,17 +1075,28 @@ class Aplicacao:
     def definir_mensagem(
         self,
         mensagem: str,
-        duracao_frames: int = 100,
+        cor: tuple[int, int, int] = BRANCO,
+        duracao_frames: int = (
+            DURACAO_MENSAGEM_INTERFACE
+        ),
     ) -> None:
         self.mensagem_temporaria = mensagem
-        self.tempo_mensagem_temporaria = (
-            duracao_frames
+        self.cor_mensagem_temporaria = cor
+
+        self.tempo_mensagem_temporaria = max(
+            0,
+            int(
+                duracao_frames
+            ),
         )
 
     def atualizar_mensagem_temporaria(
         self,
     ) -> None:
-        if self.tempo_mensagem_temporaria <= 0:
+        if (
+            self.tempo_mensagem_temporaria
+            <= 0
+        ):
             self.mensagem_temporaria = ""
             return
 
@@ -916,15 +1108,18 @@ class Aplicacao:
 
     def desenhar(self) -> None:
         """
-        Desenha todos os elementos da interface.
+        Desenha todos os elementos da aplicação.
         """
 
-        self.tela.fill(PRETO)
+        self.tela.fill(
+            PRETO
+        )
 
         if self.mundo is None:
             self.desenhar_tela_inicial(
-                "Inicializando SimLife..."
+                "Inicializando ecossistema..."
             )
+
             return
 
         self.mundo.desenhar(
@@ -947,7 +1142,11 @@ class Aplicacao:
         mensagem: str,
     ) -> None:
         self.tela.fill(
-            (8, 18, 24)
+            (
+                8,
+                18,
+                24,
+            )
         )
 
         titulo = self.fonte_grande.render(
@@ -956,40 +1155,42 @@ class Aplicacao:
             BRANCO,
         )
 
-        titulo_rect = titulo.get_rect(
+        titulo_retangulo = titulo.get_rect(
             center=(
                 LARGURA // 2,
-                ALTURA // 2 - 30,
+                ALTURA // 2 - 28,
             )
         )
 
         self.tela.blit(
             titulo,
-            titulo_rect,
+            titulo_retangulo,
         )
 
-        texto = self.fonte_media.render(
+        subtitulo = self.fonte_media.render(
             mensagem,
             True,
             COR_TEXTO_SECUNDARIO,
         )
 
-        texto_rect = texto.get_rect(
-            center=(
-                LARGURA // 2,
-                ALTURA // 2 + 20,
+        subtitulo_retangulo = (
+            subtitulo.get_rect(
+                center=(
+                    LARGURA // 2,
+                    ALTURA // 2 + 22,
+                )
             )
         )
 
         self.tela.blit(
-            texto,
-            texto_rect,
+            subtitulo,
+            subtitulo_retangulo,
         )
 
     def desenhar_separador(self) -> None:
         pygame.draw.line(
             self.tela,
-            (80, 94, 108),
+            COR_BORDA,
             (
                 AREA_SIMULACAO_LARGURA,
                 0,
@@ -1012,7 +1213,10 @@ class Aplicacao:
         painel = pygame.Rect(
             AREA_SIMULACAO_LARGURA,
             0,
-            LARGURA - AREA_SIMULACAO_LARGURA,
+            (
+                LARGURA
+                - AREA_SIMULACAO_LARGURA
+            ),
             ALTURA,
         )
 
@@ -1022,9 +1226,20 @@ class Aplicacao:
             painel,
         )
 
-        painel_x = AREA_SIMULACAO_LARGURA
-        margem = 16
-        x = painel_x + margem
+        self.desenhar_cabecalho_painel()
+        self.desenhar_rotulos_secoes()
+        self.desenhar_botoes()
+        self.desenhar_estatisticas()
+        self.desenhar_grafico()
+        self.desenhar_inspecao_ou_eventos()
+
+    def desenhar_cabecalho_painel(
+        self,
+    ) -> None:
+        x = (
+            AREA_SIMULACAO_LARGURA
+            + 14
+        )
 
         titulo = self.fonte_titulo.render(
             "SimLife",
@@ -1034,18 +1249,21 @@ class Aplicacao:
 
         self.tela.blit(
             titulo,
-            (x, 14),
+            (
+                x,
+                10,
+            ),
         )
 
         subtitulo = self.fonte_pequena.render(
-            "Ecossistema microbiano evolutivo",
+            "Ecossistema bacteriano",
             True,
             COR_TEXTO_SECUNDARIO,
         )
 
         subtitulo_x = (
             LARGURA
-            - margem
+            - 14
             - subtitulo.get_width()
         )
 
@@ -1053,33 +1271,36 @@ class Aplicacao:
             subtitulo,
             (
                 subtitulo_x,
-                22,
+                19,
             ),
         )
 
-        self.desenhar_botoes()
-        self.desenhar_rotulos_secoes()
-        self.desenhar_estatisticas()
-        self.desenhar_grafico()
-        self.desenhar_inspecao()
+    def desenhar_rotulos_secoes(
+        self,
+    ) -> None:
+        x = (
+            AREA_SIMULACAO_LARGURA
+            + 14
+        )
 
-    def desenhar_rotulos_secoes(self) -> None:
-        x = AREA_SIMULACAO_LARGURA + 16
-
-        secoes = [
+        secoes = (
             (
                 "VELOCIDADE",
-                96,
+                91,
             ),
             (
-                "FERRAMENTAS",
-                158,
+                "INTERVENÇÃO",
+                145,
             ),
             (
                 "ECOSSISTEMA",
-                226,
+                202,
             ),
-        ]
+            (
+                "POPULAÇÃO POR ESTRATÉGIA",
+                338,
+            ),
+        )
 
         for titulo, y in secoes:
             texto = self.fonte_pequena.render(
@@ -1090,11 +1311,16 @@ class Aplicacao:
 
             self.tela.blit(
                 texto,
-                (x, y),
+                (
+                    x,
+                    y,
+                ),
             )
 
     def desenhar_botoes(self) -> None:
-        posicao_mouse = pygame.mouse.get_pos()
+        posicao_mouse = (
+            pygame.mouse.get_pos()
+        )
 
         for botao in self.botoes:
             ativo = self.botao_esta_ativo(
@@ -1107,8 +1333,10 @@ class Aplicacao:
 
             if ativo:
                 cor = COR_BOTAO_ATIVO
+
             elif hover:
                 cor = COR_BOTAO_HOVER
+
             else:
                 cor = COR_BOTAO
 
@@ -1129,11 +1357,15 @@ class Aplicacao:
 
             rotulo = botao.rotulo
 
-            if botao.identificador == "pausar":
-                if self.pausado:
-                    rotulo = "Continuar"
-                else:
-                    rotulo = "Pausar"
+            if (
+                botao.identificador
+                == "pausar"
+            ):
+                rotulo = (
+                    "Continuar"
+                    if self.pausado
+                    else "Pausar"
+                )
 
             texto = self.fonte.render(
                 rotulo,
@@ -1141,13 +1373,17 @@ class Aplicacao:
                 BRANCO,
             )
 
-            texto_rect = texto.get_rect(
-                center=botao.retangulo.center
+            texto_retangulo = (
+                texto.get_rect(
+                    center=(
+                        botao.retangulo.center
+                    )
+                )
             )
 
             self.tela.blit(
                 texto,
-                texto_rect,
+                texto_retangulo,
             )
 
     def botao_esta_ativo(
@@ -1169,10 +1405,16 @@ class Aplicacao:
                 == self.ferramenta_atual
             )
 
-        if botao.identificador == "pausar":
+        if (
+            botao.identificador
+            == "pausar"
+        ):
             return self.pausado
 
-        if botao.identificador == "ajuda":
+        if (
+            botao.identificador
+            == "ajuda"
+        ):
             return self.exibir_ajuda
 
         return False
@@ -1185,85 +1427,104 @@ class Aplicacao:
         if self.mundo is None:
             return
 
-        painel_x = AREA_SIMULACAO_LARGURA
-        margem = 16
+        estatisticas = (
+            self.mundo.obter_estatisticas()
+        )
 
-        x = painel_x + margem
-        y = 246
+        x = (
+            AREA_SIMULACAO_LARGURA
+            + 14
+        )
+
+        y = 220
 
         largura = (
             LARGURA
-            - painel_x
-            - margem * 2
+            - AREA_SIMULACAO_LARGURA
+            - 28
         )
 
         area = pygame.Rect(
             x,
             y,
             largura,
-            96,
+            108,
         )
 
         pygame.draw.rect(
             self.tela,
-            COR_PAINEL_SECUNDARIA,
+            COR_PAINEL_SECUNDARIO,
             area,
             border_radius=7,
         )
 
-        estatisticas = (
-            self.mundo.obter_estatisticas()
-        )
-
-        indicadores = [
+        indicadores = (
             (
-                "Bactérias",
-                estatisticas["bacterias"],
+                "Total",
+                estatisticas[
+                    "bacterias"
+                ],
             ),
             (
-                "Algas",
-                estatisticas["algas"],
+                "Fotossintéticas",
+                estatisticas[
+                    "fotossinteticas"
+                ],
             ),
             (
-                "Protozoários",
-                estatisticas["protozoarios"],
+                "Predadoras",
+                estatisticas[
+                    "predadoras"
+                ],
             ),
             (
-                "Espécies",
-                estatisticas["especies"],
+                "Necrófagas",
+                estatisticas[
+                    "necrofagas"
+                ],
             ),
             (
                 "Carcaças",
-                estatisticas["carcacas"],
+                estatisticas[
+                    "carcacas"
+                ],
             ),
             (
-                "Ciclo",
+                "Espécies",
                 estatisticas[
-                    "ciclo_luz"
-                ].capitalize(),
+                    "especies"
+                ],
             ),
-        ]
+        )
 
         colunas = 3
-        largura_coluna = largura // colunas
+        largura_coluna = (
+            largura // colunas
+        )
 
         for indice, (
             rotulo,
             valor,
         ) in enumerate(indicadores):
-            coluna = indice % colunas
-            linha = indice // colunas
+            coluna = (
+                indice % colunas
+            )
+
+            linha = (
+                indice // colunas
+            )
 
             item_x = (
-                x
-                + coluna * largura_coluna
-                + 10
+                area.left
+                + coluna
+                * largura_coluna
+                + 9
             )
 
             item_y = (
-                y
-                + linha * 43
-                + 10
+                area.top
+                + linha * 35
+                + 7
             )
 
             texto_rotulo = (
@@ -1274,10 +1535,12 @@ class Aplicacao:
                 )
             )
 
-            texto_valor = self.fonte_media.render(
-                str(valor),
-                True,
-                BRANCO,
+            texto_valor = (
+                self.fonte_media.render(
+                    str(valor),
+                    True,
+                    BRANCO,
+                )
             )
 
             self.tela.blit(
@@ -1292,75 +1555,118 @@ class Aplicacao:
                 texto_valor,
                 (
                     item_x,
-                    item_y + 15,
+                    item_y + 14,
                 ),
             )
+
+        ciclo = str(
+            estatisticas[
+                "ciclo_luz"
+            ]
+        ).capitalize()
+
+        luz = float(
+            estatisticas[
+                "intensidade_luz"
+            ]
+        )
+
+        temperatura = float(
+            estatisticas[
+                "temperatura"
+            ]
+        )
+
+        umidade = float(
+            estatisticas[
+                "umidade"
+            ]
+        )
+
+        texto_ambiente = (
+            f"{ciclo}  •  "
+            f"Luz {luz:.0%}  •  "
+            f"{temperatura:.1f} °C  •  "
+            f"Umidade {umidade:.0%}"
+        )
+
+        texto = self.fonte_pequena.render(
+            texto_ambiente,
+            True,
+            COR_TEXTO_DISCRETO,
+        )
+
+        self.tela.blit(
+            texto,
+            (
+                area.left + 9,
+                area.bottom - 18,
+            ),
+        )
 
     # ========================================================
     # GRÁFICO
     # ========================================================
 
     def desenhar_grafico(self) -> None:
-        painel_x = AREA_SIMULACAO_LARGURA
-        margem = 16
+        x = (
+            AREA_SIMULACAO_LARGURA
+            + 14
+        )
 
-        x = painel_x + margem
-        y = 354
+        y = 356
 
         largura = (
             LARGURA
-            - painel_x
-            - margem * 2
-        )
-
-        titulo = self.fonte_pequena.render(
-            "HISTÓRICO POPULACIONAL",
-            True,
-            COR_TEXTO_SECUNDARIO,
-        )
-
-        self.tela.blit(
-            titulo,
-            (x, y),
+            - AREA_SIMULACAO_LARGURA
+            - 28
         )
 
         area = pygame.Rect(
             x,
-            y + 20,
+            y,
             largura,
-            126,
+            100,
         )
 
         self.desenhar_grafico_populacao(
             area
         )
 
-        legenda_y = area.bottom + 5
+        legenda_y = area.bottom + 7
+        legenda_x = area.left
 
-        legendas = [
+        legendas = (
             (
-                "Bactérias",
-                COR_GRAFICO_BACTERIAS,
+                "Foto",
+                COR_GRAFICO_FOTOSSINTETICAS,
             ),
             (
-                "Algas",
-                COR_GRAFICO_ALGAS,
+                "Predadoras",
+                COR_GRAFICO_PREDADORAS,
             ),
             (
-                "Protozoários",
-                COR_GRAFICO_PROTOZOARIOS,
+                "Necrófagas",
+                COR_GRAFICO_NECROFAGAS,
             ),
-        ]
+        )
 
-        legenda_x = x
+        avancos = (
+            75,
+            112,
+            0,
+        )
 
-        for nome, cor in legendas:
+        for indice, (
+            nome,
+            cor,
+        ) in enumerate(legendas):
             pygame.draw.circle(
                 self.tela,
                 cor,
                 (
                     legenda_x + 5,
-                    legenda_y + 7,
+                    legenda_y + 6,
                 ),
                 4,
             )
@@ -1379,7 +1685,9 @@ class Aplicacao:
                 ),
             )
 
-            legenda_x += 105
+            legenda_x += avancos[
+                indice
+            ]
 
     def desenhar_grafico_populacao(
         self,
@@ -1387,63 +1695,67 @@ class Aplicacao:
     ) -> None:
         pygame.draw.rect(
             self.tela,
-            (17, 22, 28),
+            COR_PAINEL_TERCIARIO,
             area,
             border_radius=6,
         )
 
         pygame.draw.rect(
             self.tela,
-            (65, 76, 88),
+            COR_BORDA,
             area,
             width=1,
             border_radius=6,
         )
 
-        # Linhas horizontais de referência.
-        for indice in range(1, 4):
-            y = (
+        for indice in range(
+            1,
+            4,
+        ):
+            linha_y = (
                 area.top
-                + indice * area.height // 4
+                + indice
+                * area.height
+                // 4
             )
 
             pygame.draw.line(
                 self.tela,
-                (40, 49, 58),
+                COR_GRADE_GRAFICO,
                 (
                     area.left + 1,
-                    y,
+                    linha_y,
                 ),
                 (
                     area.right - 1,
-                    y,
+                    linha_y,
                 ),
                 1,
             )
 
-        historicos = [
+        historicos = (
             (
-                self.historico_bacterias,
-                COR_GRAFICO_BACTERIAS,
+                self.historico_fotossinteticas,
+                COR_GRAFICO_FOTOSSINTETICAS,
             ),
             (
-                self.historico_algas,
-                COR_GRAFICO_ALGAS,
+                self.historico_predadoras,
+                COR_GRAFICO_PREDADORAS,
             ),
             (
-                self.historico_protozoarios,
-                COR_GRAFICO_PROTOZOARIOS,
+                self.historico_necrofagas,
+                COR_GRAFICO_NECROFAGAS,
             ),
-        ]
+        )
 
         maior_valor = max(
-            [
+            (
                 max(
                     historico,
                     default=1,
                 )
                 for historico, _ in historicos
-            ],
+            ),
             default=1,
         )
 
@@ -1456,13 +1768,13 @@ class Aplicacao:
             if len(historico) < 2:
                 continue
 
-            pontos: list[
-                tuple[int, int]
-            ] = []
-
             valores = list(
                 historico
             )
+
+            pontos: list[
+                tuple[int, int]
+            ] = []
 
             for indice, valor in enumerate(
                 valores
@@ -1476,22 +1788,28 @@ class Aplicacao:
                 )
 
                 proporcao_y = (
-                    valor / maior_valor
+                    valor
+                    / maior_valor
                 )
 
                 ponto_x = (
                     area.left
                     + int(
                         proporcao_x
-                        * area.width
+                        * (
+                            area.width - 2
+                        )
                     )
                 )
 
                 ponto_y = (
                     area.bottom
+                    - 1
                     - int(
                         proporcao_y
-                        * area.height
+                        * (
+                            area.height - 2
+                        )
                     )
                 )
 
@@ -1511,115 +1829,236 @@ class Aplicacao:
             )
 
     # ========================================================
-    # INSPEÇÃO
+    # INSPEÇÃO E EVENTOS
     # ========================================================
 
-    def desenhar_inspecao(self) -> None:
-        painel_x = AREA_SIMULACAO_LARGURA
-        margem = 16
+    def desenhar_inspecao_ou_eventos(
+        self,
+    ) -> None:
+        x = (
+            AREA_SIMULACAO_LARGURA
+            + 14
+        )
 
-        x = painel_x + margem
-        y = 518
+        y = 486
 
         largura = (
             LARGURA
-            - painel_x
-            - margem * 2
+            - AREA_SIMULACAO_LARGURA
+            - 28
         )
 
-        titulo = self.fonte_pequena.render(
-            "ORGANISMO SELECIONADO",
-            True,
-            COR_TEXTO_SECUNDARIO,
+        altura = (
+            ALTURA
+            - y
+            - 14
+        )
+
+        titulo = (
+            "ORGANISMO SELECIONADO"
+            if self.organismo_selecionado
+            is not None
+            else "EVENTOS RECENTES"
+        )
+
+        texto_titulo = (
+            self.fonte_pequena.render(
+                titulo,
+                True,
+                COR_TEXTO_SECUNDARIO,
+            )
         )
 
         self.tela.blit(
-            titulo,
-            (x, y),
+            texto_titulo,
+            (
+                x,
+                y,
+            ),
         )
 
         area = pygame.Rect(
             x,
-            y + 20,
+            y + 19,
             largura,
-            max(
-                100,
-                ALTURA - y - 36,
-            ),
+            altura - 19,
         )
 
         pygame.draw.rect(
             self.tela,
-            COR_PAINEL_SECUNDARIA,
+            COR_PAINEL_SECUNDARIO,
             area,
             border_radius=7,
         )
 
-        organismo = self.organismo_selecionado
-
-        if organismo is None:
-            mensagem = self.fonte.render(
-                "Use a ferramenta Inspecionar",
-                True,
-                COR_TEXTO_SECUNDARIO,
+        if (
+            self.organismo_selecionado
+            is None
+        ):
+            self.desenhar_eventos(
+                area
             )
 
-            mensagem_2 = self.fonte_pequena.render(
-                "e clique em um organismo.",
+        else:
+            self.desenhar_dados_organismo(
+                self.organismo_selecionado,
+                area,
+            )
+
+    def desenhar_eventos(
+        self,
+        area: pygame.Rect,
+    ) -> None:
+        if self.mundo is None:
+            return
+
+        eventos = (
+            self.mundo.obter_eventos(
+                limite=6
+            )
+        )
+
+        if not eventos:
+            texto = self.fonte.render(
+                "Nenhum evento registrado.",
                 True,
                 COR_TEXTO_SECUNDARIO,
             )
 
             self.tela.blit(
-                mensagem,
+                texto,
                 (
                     area.left + 12,
-                    area.top + 18,
-                ),
-            )
-
-            self.tela.blit(
-                mensagem_2,
-                (
-                    area.left + 12,
-                    area.top + 43,
+                    area.top + 14,
                 ),
             )
 
             return
 
-        self.desenhar_dados_organismo(
-            organismo,
-            area,
-        )
+        y = area.top + 10
+
+        for evento in eventos:
+            tempo = evento.get(
+                "tempo",
+                0,
+            )
+
+            mensagem = str(
+                evento.get(
+                    "mensagem",
+                    "",
+                )
+            )
+
+            linhas = self.quebrar_texto(
+                mensagem,
+                limite=44,
+            )
+
+            texto_tempo = (
+                self.fonte_pequena.render(
+                    f"T{tempo}",
+                    True,
+                    COR_TEXTO_DISCRETO,
+                )
+            )
+
+            self.tela.blit(
+                texto_tempo,
+                (
+                    area.left + 10,
+                    y,
+                ),
+            )
+
+            texto_mensagem = (
+                self.fonte_pequena.render(
+                    linhas[0]
+                    if linhas
+                    else mensagem,
+                    True,
+                    BRANCO,
+                )
+            )
+
+            self.tela.blit(
+                texto_mensagem,
+                (
+                    area.left + 50,
+                    y,
+                ),
+            )
+
+            y += 26
+
+            if (
+                y + 20
+                > area.bottom
+            ):
+                break
 
     def desenhar_dados_organismo(
         self,
-        organismo: Any,
+        organismo: Bacteria | Carcaca,
         area: pygame.Rect,
     ) -> None:
-        nome = self.obter_nome_organismo(
-            organismo
-        )
-
-        cor = getattr(
+        if isinstance(
             organismo,
-            "cor",
-            BRANCO,
+            Bacteria,
+        ):
+            self.desenhar_dados_bacteria(
+                organismo,
+                area,
+            )
+
+        else:
+            self.desenhar_dados_carcaca(
+                organismo,
+                area,
+            )
+
+    def desenhar_dados_bacteria(
+        self,
+        bacteria: Bacteria,
+        area: pygame.Rect,
+    ) -> None:
+        cor_estrategia = (
+            CORES_ESTRATEGIAS.get(
+                bacteria.estrategia_alimentar,
+                BRANCO,
+            )
         )
 
         pygame.draw.circle(
             self.tela,
-            cor,
+            bacteria.cor,
             (
                 area.left + 18,
-                area.top + 19,
+                area.top + 18,
             ),
-            7,
+            8,
+        )
+
+        pygame.draw.circle(
+            self.tela,
+            cor_estrategia,
+            (
+                area.left + 18,
+                area.top + 18,
+            ),
+            10,
+            2,
+        )
+
+        estrategia_nome = (
+            NOMES_ESTRATEGIAS.get(
+                bacteria.estrategia_alimentar,
+                bacteria.estrategia_alimentar,
+            )
         )
 
         titulo = self.fonte_media.render(
-            nome,
+            estrategia_nome,
             True,
             BRANCO,
         )
@@ -1627,161 +2066,167 @@ class Aplicacao:
         self.tela.blit(
             titulo,
             (
-                area.left + 34,
-                area.top + 8,
+                area.left + 36,
+                area.top + 7,
             ),
         )
 
-        energia = float(
-            getattr(
-                organismo,
-                "energia",
-                0.0,
+        dados = (
+            (
+                "Espécie",
+                bacteria.especie,
+            ),
+            (
+                "Energia",
+                f"{bacteria.energia:.1f}",
+            ),
+            (
+                "Idade",
+                (
+                    f"{bacteria.idade}/"
+                    f"{bacteria.esperanca_vida}"
+                ),
+            ),
+            (
+                "Geração",
+                bacteria.geracao,
+            ),
+            (
+                "Velocidade",
+                f"{bacteria.velocidade:.2f}",
+            ),
+            (
+                "Tamanho",
+                bacteria.tamanho,
+            ),
+            (
+                "Ataque",
+                f"{bacteria.ataque:.2f}",
+            ),
+            (
+                "Defesa",
+                f"{bacteria.defesa:.2f}",
+            ),
+            (
+                "Metabolismo",
+                (
+                    f"{bacteria.eficiencia_metabolica:.2f}"
+                ),
+            ),
+            (
+                "Mutação",
+                (
+                    f"{bacteria.taxa_mutacao:.1%}"
+                ),
+            ),
+        )
+
+        self.desenhar_grade_dados(
+            dados=dados,
+            area=area,
+            inicio_y=area.top + 40,
+        )
+
+    def desenhar_dados_carcaca(
+        self,
+        carcaca: Carcaca,
+        area: pygame.Rect,
+    ) -> None:
+        pygame.draw.circle(
+            self.tela,
+            carcaca.cor,
+            (
+                area.left + 18,
+                area.top + 18,
+            ),
+            8,
+        )
+
+        titulo = self.fonte_media.render(
+            "Carcaça",
+            True,
+            BRANCO,
+        )
+
+        self.tela.blit(
+            titulo,
+            (
+                area.left + 36,
+                area.top + 7,
+            ),
+        )
+
+        estrategia_origem = (
+            NOMES_ESTRATEGIAS.get(
+                carcaca.origem_estrategia,
+                carcaca.origem_estrategia
+                or "-",
             )
         )
 
-        dados: list[
-            tuple[str, str]
-        ] = [
+        dados = (
             (
                 "Energia",
-                f"{energia:.1f}",
+                f"{carcaca.energia:.1f}",
+            ),
+            (
+                "Idade",
+                carcaca.idade,
+            ),
+            (
+                "Espécie origem",
+                (
+                    carcaca.origem_especie
+                    or "-"
+                ),
+            ),
+            (
+                "Estratégia origem",
+                estrategia_origem,
             ),
             (
                 "Posição",
                 (
-                    f"{int(organismo.x)}, "
-                    f"{int(organismo.y)}"
+                    f"{int(carcaca.x)}, "
+                    f"{int(carcaca.y)}"
                 ),
             ),
             (
-                "Tamanho",
-                str(
-                    getattr(
-                        organismo,
-                        "tamanho",
-                        "-",
-                    )
+                "Disponível",
+                (
+                    "Sim"
+                    if carcaca.esta_disponivel()
+                    else "Não"
                 ),
             ),
-        ]
-
-        classe = (
-            organismo.__class__.__name__
         )
 
-        if classe == "Bacteria":
-            dados.extend(
-                [
-                    (
-                        "Espécie",
-                        str(
-                            getattr(
-                                organismo,
-                                "especie",
-                                "-",
-                            )
-                        ),
-                    ),
-                    (
-                        "Alimentação",
-                        str(
-                            getattr(
-                                organismo,
-                                "presa",
-                                "-",
-                            )
-                        ),
-                    ),
-                    (
-                        "Idade",
-                        (
-                            f"{getattr(organismo, 'idade', 0)}"
-                            "/"
-                            f"{getattr(organismo, 'esperanca_vida', '-')}"
-                        ),
-                    ),
-                    (
-                        "Velocidade",
-                        self.formatar_numero(
-                            getattr(
-                                organismo,
-                                "velocidade",
-                                0,
-                            )
-                        ),
-                    ),
-                    (
-                        "Ataque",
-                        self.formatar_numero(
-                            getattr(
-                                organismo,
-                                "ataque",
-                                0,
-                            )
-                        ),
-                    ),
-                    (
-                        "Defesa",
-                        self.formatar_numero(
-                            getattr(
-                                organismo,
-                                "defesa",
-                                0,
-                            )
-                        ),
-                    ),
-                    (
-                        "Mutação",
-                        self.formatar_percentual(
-                            getattr(
-                                organismo,
-                                "taxa_mutacao",
-                                0,
-                            )
-                        ),
-                    ),
-                ]
-            )
-
-        elif classe == "Protozoario":
-            dados.extend(
-                [
-                    (
-                        "Idade",
-                        str(
-                            getattr(
-                                organismo,
-                                "idade",
-                                "-",
-                            )
-                        ),
-                    ),
-                    (
-                        "Velocidade",
-                        self.formatar_numero(
-                            getattr(
-                                organismo,
-                                "velocidade",
-                                0,
-                            )
-                        ),
-                    ),
-                ]
-            )
-
-        coluna_esquerda_x = (
-            area.left + 12
+        self.desenhar_grade_dados(
+            dados=dados,
+            area=area,
+            inicio_y=area.top + 40,
         )
 
-        coluna_direita_x = (
+    def desenhar_grade_dados(
+        self,
+        dados: tuple[
+            tuple[str, Any],
+            ...,
+        ],
+        area: pygame.Rect,
+        inicio_y: int,
+    ) -> None:
+        coluna_esquerda = (
+            area.left + 11
+        )
+
+        coluna_direita = (
             area.left
             + area.width // 2
-            + 4
+            + 3
         )
 
-        inicio_y = area.top + 42
-        altura_linha = 27
+        altura_linha = 31
 
         for indice, (
             rotulo,
@@ -1790,35 +2235,35 @@ class Aplicacao:
             coluna = indice % 2
             linha = indice // 2
 
-            item_x = (
-                coluna_esquerda_x
+            x = (
+                coluna_esquerda
                 if coluna == 0
-                else coluna_direita_x
+                else coluna_direita
             )
 
-            item_y = (
+            y = (
                 inicio_y
-                + linha * altura_linha
+                + linha
+                * altura_linha
             )
 
             if (
-                item_y
-                + altura_linha
+                y + altura_linha
                 > area.bottom
             ):
                 break
 
             texto_rotulo = (
                 self.fonte_pequena.render(
-                    rotulo,
+                    str(rotulo),
                     True,
                     COR_TEXTO_SECUNDARIO,
                 )
             )
 
-            valor_limitado = (
-                str(valor)[:22]
-            )
+            valor_limitado = str(
+                valor
+            )[:22]
 
             texto_valor = self.fonte.render(
                 valor_limitado,
@@ -1829,53 +2274,40 @@ class Aplicacao:
             self.tela.blit(
                 texto_rotulo,
                 (
-                    item_x,
-                    item_y,
+                    x,
+                    y,
                 ),
             )
 
             self.tela.blit(
                 texto_valor,
                 (
-                    item_x,
-                    item_y + 12,
+                    x,
+                    y + 13,
                 ),
             )
 
-    @staticmethod
-    def formatar_numero(
-        valor: Any,
-    ) -> str:
-        try:
-            return f"{float(valor):.2f}"
-        except (
-            TypeError,
-            ValueError,
-        ):
-            return str(valor)
-
-    @staticmethod
-    def formatar_percentual(
-        valor: Any,
-    ) -> str:
-        try:
-            return f"{float(valor) * 100:.1f}%"
-        except (
-            TypeError,
-            ValueError,
-        ):
-            return str(valor)
+    # ========================================================
+    # DESTAQUE DO ORGANISMO
+    # ========================================================
 
     def desenhar_organismo_selecionado(
         self,
     ) -> None:
-        organismo = self.organismo_selecionado
+        organismo = (
+            self.organismo_selecionado
+        )
 
         if organismo is None:
             return
 
-        x = int(organismo.x)
-        y = int(organismo.y)
+        x = int(
+            organismo.x
+        )
+
+        y = int(
+            organismo.y
+        )
 
         tamanho = int(
             getattr(
@@ -1886,13 +2318,13 @@ class Aplicacao:
         )
 
         raio = max(
-            11,
-            tamanho + 7,
+            12,
+            tamanho + 8,
         )
 
         pygame.draw.circle(
             self.tela,
-            COR_DESTAQUE,
+            COR_DESTAQUE_SELECAO,
             (
                 x,
                 y,
@@ -1901,79 +2333,107 @@ class Aplicacao:
             2,
         )
 
-        direcao = getattr(
+        if not isinstance(
             organismo,
-            "direcao",
+            Bacteria,
+        ):
+            return
+
+        comprimento = (
+            raio + 12
+        )
+
+        destino_x = (
+            x
+            + int(
+                math.cos(
+                    organismo.direcao
+                )
+                * comprimento
+            )
+        )
+
+        destino_y = (
+            y
+            + int(
+                math.sin(
+                    organismo.direcao
+                )
+                * comprimento
+            )
+        )
+
+        pygame.draw.line(
+            self.tela,
+            COR_DESTAQUE_SELECAO,
+            (
+                x,
+                y,
+            ),
+            (
+                destino_x,
+                destino_y,
+            ),
+            2,
+        )
+
+        superficie = pygame.Surface(
+            (
+                AREA_SIMULACAO_LARGURA,
+                ALTURA,
+            ),
+            pygame.SRCALPHA,
+        )
+
+        pygame.draw.circle(
+            superficie,
+            (
+                COR_DESTAQUE_SELECAO[0],
+                COR_DESTAQUE_SELECAO[1],
+                COR_DESTAQUE_SELECAO[2],
+                45,
+            ),
+            (
+                x,
+                y,
+            ),
+            int(
+                organismo.raio_deteccao
+            ),
+            1,
+        )
+
+        self.tela.blit(
+            superficie,
+            (
+                0,
+                0,
+            ),
+        )
+
+        alvo = getattr(
+            organismo,
+            "alvo_atual",
             None,
         )
 
-        if direcao is not None:
-            comprimento = raio + 10
-
-            destino_x = (
-                x
-                + int(
-                    math.cos(direcao)
-                    * comprimento
-                )
-            )
-
-            destino_y = (
-                y
-                + int(
-                    math.sin(direcao)
-                    * comprimento
-                )
-            )
-
+        if alvo is not None:
             pygame.draw.line(
                 self.tela,
-                COR_DESTAQUE,
                 (
-                    x,
-                    y,
-                ),
-                (
-                    destino_x,
-                    destino_y,
-                ),
-                2,
-            )
-
-        raio_deteccao = getattr(
-            organismo,
-            "raio_deteccao",
-            None,
-        )
-
-        if raio_deteccao is not None:
-            superficie = pygame.Surface(
-                (
-                    AREA_SIMULACAO_LARGURA,
-                    ALTURA,
-                ),
-                pygame.SRCALPHA,
-            )
-
-            pygame.draw.circle(
-                superficie,
-                (
-                    COR_DESTAQUE[0],
-                    COR_DESTAQUE[1],
-                    COR_DESTAQUE[2],
-                    45,
+                    255,
+                    130,
+                    80,
                 ),
                 (
                     x,
                     y,
                 ),
-                int(raio_deteccao),
+                (
+                    int(alvo.x),
+                    int(alvo.y),
+                ),
                 1,
-            )
-
-            self.tela.blit(
-                superficie,
-                (0, 0),
             )
 
     # ========================================================
@@ -1989,10 +2449,14 @@ class Aplicacao:
         texto = self.fonte.render(
             self.mensagem_temporaria,
             True,
-            BRANCO,
+            self.cor_mensagem_temporaria,
         )
 
-        largura = texto.get_width() + 28
+        largura = min(
+            texto.get_width() + 28,
+            AREA_SIMULACAO_LARGURA - 28,
+        )
+
         altura = 36
 
         area = pygame.Rect(
@@ -2011,7 +2475,12 @@ class Aplicacao:
         )
 
         superficie.fill(
-            (10, 15, 20, 210)
+            (
+                10,
+                15,
+                20,
+                220,
+            )
         )
 
         self.tela.blit(
@@ -2021,7 +2490,7 @@ class Aplicacao:
 
         pygame.draw.rect(
             self.tela,
-            (80, 95, 110),
+            COR_BORDA,
             area,
             width=1,
             border_radius=6,
@@ -2044,13 +2513,19 @@ class Aplicacao:
             BRANCO,
         )
 
-        largura = texto.get_width() + 30
+        largura = (
+            texto.get_width()
+            + 30
+        )
+
         altura = 38
 
         area = pygame.Rect(
-            AREA_SIMULACAO_LARGURA
-            - largura
-            - 14,
+            (
+                AREA_SIMULACAO_LARGURA
+                - largura
+                - 14
+            ),
             14,
             largura,
             altura,
@@ -2065,7 +2540,12 @@ class Aplicacao:
         )
 
         superficie.fill(
-            (20, 20, 20, 210)
+            (
+                20,
+                20,
+                20,
+                215,
+            )
         )
 
         self.tela.blit(
@@ -2075,19 +2555,21 @@ class Aplicacao:
 
         pygame.draw.rect(
             self.tela,
-            COR_DESTAQUE,
+            COR_DESTAQUE_SELECAO,
             area,
             width=2,
             border_radius=7,
         )
 
-        texto_rect = texto.get_rect(
-            center=area.center
+        texto_retangulo = (
+            texto.get_rect(
+                center=area.center
+            )
         )
 
         self.tela.blit(
             texto,
-            texto_rect,
+            texto_retangulo,
         )
 
     # ========================================================
@@ -2095,18 +2577,36 @@ class Aplicacao:
     # ========================================================
 
     def desenhar_ajuda(self) -> None:
-        largura_ajuda = min(
-            620,
-            AREA_SIMULACAO_LARGURA - 60,
+        superficie_escura = pygame.Surface(
+            (
+                LARGURA,
+                ALTURA,
+            ),
+            pygame.SRCALPHA,
         )
 
-        altura_ajuda = min(
-            470,
-            ALTURA - 60,
+        superficie_escura.fill(
+            (
+                0,
+                0,
+                0,
+                165,
+            )
         )
+
+        self.tela.blit(
+            superficie_escura,
+            (
+                0,
+                0,
+            ),
+        )
+
+        largura_ajuda = 690
+        altura_ajuda = 500
 
         x = (
-            AREA_SIMULACAO_LARGURA
+            LARGURA
             - largura_ajuda
         ) // 2
 
@@ -2114,23 +2614,6 @@ class Aplicacao:
             ALTURA
             - altura_ajuda
         ) // 2
-
-        sombra = pygame.Surface(
-            (
-                AREA_SIMULACAO_LARGURA,
-                ALTURA,
-            ),
-            pygame.SRCALPHA,
-        )
-
-        sombra.fill(
-            (0, 0, 0, 145)
-        )
-
-        self.tela.blit(
-            sombra,
-            (0, 0),
-        )
 
         area = pygame.Rect(
             x,
@@ -2141,14 +2624,22 @@ class Aplicacao:
 
         pygame.draw.rect(
             self.tela,
-            (22, 28, 34),
+            (
+                22,
+                28,
+                34,
+            ),
             area,
             border_radius=10,
         )
 
         pygame.draw.rect(
             self.tela,
-            (100, 116, 132),
+            (
+                100,
+                116,
+                132,
+            ),
             area,
             width=2,
             border_radius=10,
@@ -2168,39 +2659,51 @@ class Aplicacao:
             ),
         )
 
-        descricao = (
-            "Observe, interfira e acompanhe a evolução "
-            "do ecossistema microbiano."
-        )
-
-        texto_descricao = (
-            self.fonte.render(
-                descricao,
-                True,
-                COR_TEXTO_SECUNDARIO,
-            )
+        descricao = self.fonte.render(
+            (
+                "Todas as entidades vivas são bactérias. "
+                "O metabolismo define sua estratégia ecológica."
+            ),
+            True,
+            COR_TEXTO_SECUNDARIO,
         )
 
         self.tela.blit(
-            texto_descricao,
+            descricao,
             (
                 x + 24,
-                y + 54,
+                y + 55,
             ),
         )
 
-        comandos = [
+        comandos = (
             (
-                "Inspecionar",
-                "Clique em um organismo para visualizar seus atributos.",
+                "Inspecionar / I",
+                (
+                    "Clique em uma bactéria ou carcaça "
+                    "para ver seus atributos."
+                ),
             ),
             (
-                "+ Alga",
-                "Selecione a ferramenta e clique na área da simulação.",
+                "Fotossintética / F",
+                (
+                    "Adiciona uma bactéria que obtém "
+                    "energia por fotossíntese."
+                ),
             ),
             (
-                "+ Bactéria",
-                "Adiciona uma nova bactéria herbívora.",
+                "Predadora / P",
+                (
+                    "Adiciona uma bactéria que caça "
+                    "outras bactérias."
+                ),
+            ),
+            (
+                "Necrófaga / N",
+                (
+                    "Adiciona uma bactéria que consome "
+                    "carcaças."
+                ),
             ),
             (
                 "Espaço",
@@ -2212,30 +2715,31 @@ class Aplicacao:
             ),
             (
                 "1, 2, 3 e 4",
-                "Altera a velocidade para 1x, 2x, 4x e 8x.",
-            ),
-            (
-                "I, A e B",
-                "Seleciona inspeção, alga ou bactéria.",
+                (
+                    "Altera a velocidade para "
+                    "1x, 2x, 4x e 8x."
+                ),
             ),
             (
                 "Clique direito",
-                "Adiciona rapidamente uma bactéria.",
+                "Inspeciona rapidamente uma entidade.",
             ),
             (
                 "Esc",
-                "Fecha esta ajuda ou limpa a seleção.",
+                "Fecha a ajuda ou limpa a seleção.",
             ),
-        ]
+        )
 
-        linha_y = y + 95
+        linha_y = (
+            y + 100
+        )
 
         for atalho, explicacao in comandos:
             texto_atalho = (
                 self.fonte.render(
                     atalho,
                     True,
-                    COR_DESTAQUE,
+                    COR_DESTAQUE_SELECAO,
                 )
             )
 
@@ -2258,12 +2762,12 @@ class Aplicacao:
             self.tela.blit(
                 texto_explicacao,
                 (
-                    x + 155,
+                    x + 185,
                     linha_y,
                 ),
             )
 
-            linha_y += 34
+            linha_y += 37
 
         rodape = self.fonte_pequena.render(
             "Clique em qualquer lugar para fechar.",
@@ -2271,16 +2775,18 @@ class Aplicacao:
             COR_TEXTO_SECUNDARIO,
         )
 
-        rodape_rect = rodape.get_rect(
-            center=(
-                area.centerx,
-                area.bottom - 22,
+        rodape_retangulo = (
+            rodape.get_rect(
+                center=(
+                    area.centerx,
+                    area.bottom - 22,
+                )
             )
         )
 
         self.tela.blit(
             rodape,
-            rodape_rect,
+            rodape_retangulo,
         )
 
     # ========================================================
@@ -2293,13 +2799,19 @@ class Aplicacao:
         detalhe: str,
     ) -> None:
         self.tela.fill(
-            (34, 10, 14)
+            (
+                34,
+                10,
+                14,
+            )
         )
 
-        texto_titulo = self.fonte_grande.render(
-            titulo,
-            True,
-            BRANCO,
+        texto_titulo = (
+            self.fonte_grande.render(
+                titulo,
+                True,
+                BRANCO,
+            )
         )
 
         self.tela.blit(
@@ -2311,11 +2823,11 @@ class Aplicacao:
         )
 
         linhas = self.quebrar_texto(
-            detalhe[:500],
-            limite=85,
+            detalhe[:600],
+            limite=88,
         )
 
-        y = 100
+        y = 105
 
         for linha in linhas:
             texto = self.fonte.render(
