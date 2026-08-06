@@ -6,13 +6,21 @@ from __future__ import annotations
 # JANELA E ÁREA DA SIMULAÇÃO
 # ============================================================
 
-LARGURA = 1350
-ALTURA = 950
+# Dimensão alinhada ao template padrão do Pygbag.
+LARGURA = 1280
+ALTURA = 720
 
-AREA_SIMULACAO_LARGURA = 950
-PAINEL_LATERAL_LARGURA = LARGURA - AREA_SIMULACAO_LARGURA
+# Área principal do ecossistema.
+AREA_SIMULACAO_LARGURA = 880
 
-TITULO_JANELA = "Simulação de Evolução Bacteriana"
+# Painel lateral da interface.
+PAINEL_LATERAL_LARGURA = (
+    LARGURA - AREA_SIMULACAO_LARGURA
+)
+
+TITULO_JANELA = (
+    "SimLife — Evolução Microbiana"
+)
 
 FPS = 30
 
@@ -59,7 +67,10 @@ QUANTIDADE_REINTRODUCAO_ALGAS = 100
 # CICLO AMBIENTAL
 # ============================================================
 
+# Quantidade de atualizações entre dia e noite.
 DURACAO_CICLO = 500
+
+# Quantidade de atualizações de uma estação ambiental.
 DURACAO_ESTACAO = 5000
 
 TEMPERATURA_MEDIA = 25.0
@@ -174,6 +185,7 @@ RUIDO_BROWNIANO_INTELIGENTE = 0.08
 RUIDO_BROWNIANO_PADRAO = 0.18
 
 DISTANCIA_AMOSTRA_QUIMIOTAXIA = 14.0
+
 INTENSIDADE_QUIMIOTAXIA_INTELIGENTE = 0.45
 INTENSIDADE_QUIMIOTAXIA_PADRAO = 0.15
 
@@ -196,6 +208,7 @@ DEGRADACAO_CARCACA_PADRAO = 0.05
 # ============================================================
 
 ENERGIA_INICIAL_PROTOZOARIO = 200.0
+
 ENERGIA_CONSUMO_BACTERIA_PROTOZOARIO = 50.0
 
 TAMANHO_PROTOZOARIO = 8
@@ -222,6 +235,8 @@ QUADTREE_PROFUNDIDADE_MAXIMA = 10
 # INTERFACE E HISTÓRICO
 # ============================================================
 
+# Mantida para compatibilidade com módulos antigos.
+# O novo main.py utiliza pygame.font.Font(None, tamanho).
 FONTE_PADRAO = "Arial"
 
 TAMANHO_FONTE = 16
@@ -233,7 +248,28 @@ TAMANHO_HISTORICO = 300
 MAX_ESPECIES_EXIBIDAS = 10
 
 VELOCIDADE_SIMULACAO_MINIMA = 1
-VELOCIDADE_SIMULACAO_MAXIMA = 10
+VELOCIDADE_SIMULACAO_MAXIMA = 8
+
+VELOCIDADES_DISPONIVEIS = (
+    1,
+    2,
+    4,
+    8,
+)
+
+
+# ============================================================
+# INTERAÇÃO
+# ============================================================
+
+# Distância mínima usada para selecionar organismos pequenos.
+RAIO_MINIMO_SELECAO = 12.0
+
+# Espaço adicional ao redor do organismo para facilitar o clique.
+MARGEM_SELECAO_ORGANISMO = 8.0
+
+# Quantidade de frames durante os quais mensagens ficam visíveis.
+DURACAO_MENSAGEM_INTERFACE = 100
 
 
 # ============================================================
@@ -248,10 +284,14 @@ def validar_configuracoes() -> None:
     """
 
     if LARGURA <= 0:
-        raise ValueError("LARGURA deve ser maior que zero.")
+        raise ValueError(
+            "LARGURA deve ser maior que zero."
+        )
 
     if ALTURA <= 0:
-        raise ValueError("ALTURA deve ser maior que zero.")
+        raise ValueError(
+            "ALTURA deve ser maior que zero."
+        )
 
     if AREA_SIMULACAO_LARGURA <= 0:
         raise ValueError(
@@ -263,8 +303,25 @@ def validar_configuracoes() -> None:
             "AREA_SIMULACAO_LARGURA deve ser menor que LARGURA."
         )
 
+    if PAINEL_LATERAL_LARGURA <= 0:
+        raise ValueError(
+            "PAINEL_LATERAL_LARGURA deve ser maior que zero."
+        )
+
+    if (
+        AREA_SIMULACAO_LARGURA
+        + PAINEL_LATERAL_LARGURA
+        != LARGURA
+    ):
+        raise ValueError(
+            "A área da simulação e o painel devem completar "
+            "a largura total da janela."
+        )
+
     if FPS <= 0:
-        raise ValueError("FPS deve ser maior que zero.")
+        raise ValueError(
+            "FPS deve ser maior que zero."
+        )
 
     if MAX_BACTERIAS < 0:
         raise ValueError(
@@ -281,9 +338,25 @@ def validar_configuracoes() -> None:
             "MAX_PROTOZOARIOS não pode ser negativo."
         )
 
+    if BACTERIAS_INICIAIS < 0:
+        raise ValueError(
+            "BACTERIAS_INICIAIS não pode ser negativo."
+        )
+
+    if ALGAS_INICIAIS < 0:
+        raise ValueError(
+            "ALGAS_INICIAIS não pode ser negativo."
+        )
+
+    if PROTOZOARIOS_INICIAIS < 0:
+        raise ValueError(
+            "PROTOZOARIOS_INICIAIS não pode ser negativo."
+        )
+
     if BACTERIAS_INICIAIS > MAX_BACTERIAS:
         raise ValueError(
-            "BACTERIAS_INICIAIS não pode exceder MAX_BACTERIAS."
+            "BACTERIAS_INICIAIS não pode exceder "
+            "MAX_BACTERIAS."
         )
 
     if ALGAS_INICIAIS > MAX_ALGAS:
@@ -297,6 +370,11 @@ def validar_configuracoes() -> None:
             "MAX_PROTOZOARIOS."
         )
 
+    if QUANTIDADE_REINTRODUCAO_ALGAS < 0:
+        raise ValueError(
+            "QUANTIDADE_REINTRODUCAO_ALGAS não pode ser negativa."
+        )
+
     if DURACAO_CICLO <= 0:
         raise ValueError(
             "DURACAO_CICLO deve ser maior que zero."
@@ -307,6 +385,16 @@ def validar_configuracoes() -> None:
             "DURACAO_ESTACAO deve ser maior que zero."
         )
 
+    if not 0.0 <= UMIDADE_MEDIA <= 1.0:
+        raise ValueError(
+            "UMIDADE_MEDIA deve estar entre 0 e 1."
+        )
+
+    if not 0.0 <= INTENSIDADE_MINIMA_DIA <= 1.0:
+        raise ValueError(
+            "INTENSIDADE_MINIMA_DIA deve estar entre 0 e 1."
+        )
+
     if ENERGIA_REPRODUCAO_ALGA <= 0:
         raise ValueError(
             "ENERGIA_REPRODUCAO_ALGA deve ser maior que zero."
@@ -315,6 +403,68 @@ def validar_configuracoes() -> None:
     if ENERGIA_REPRODUCAO_BACTERIA <= 0:
         raise ValueError(
             "ENERGIA_REPRODUCAO_BACTERIA deve ser maior que zero."
+        )
+
+    if TAMANHO_MINIMO_BACTERIA < 1:
+        raise ValueError(
+            "TAMANHO_MINIMO_BACTERIA deve ser pelo menos 1."
+        )
+
+    if (
+        TAMANHO_MAXIMO_BACTERIA
+        < TAMANHO_MINIMO_BACTERIA
+    ):
+        raise ValueError(
+            "TAMANHO_MAXIMO_BACTERIA deve ser maior ou igual "
+            "a TAMANHO_MINIMO_BACTERIA."
+        )
+
+    if VELOCIDADE_MINIMA <= 0:
+        raise ValueError(
+            "VELOCIDADE_MINIMA deve ser maior que zero."
+        )
+
+    if VELOCIDADE_MAXIMA < VELOCIDADE_MINIMA:
+        raise ValueError(
+            "VELOCIDADE_MAXIMA deve ser maior ou igual "
+            "a VELOCIDADE_MINIMA."
+        )
+
+    if DEFESA_MAXIMA < DEFESA_MINIMA:
+        raise ValueError(
+            "DEFESA_MAXIMA deve ser maior ou igual "
+            "a DEFESA_MINIMA."
+        )
+
+    if ATAQUE_MAXIMO < ATAQUE_MINIMO:
+        raise ValueError(
+            "ATAQUE_MAXIMO deve ser maior ou igual "
+            "a ATAQUE_MINIMO."
+        )
+
+    if (
+        EFICIENCIA_METABOLICA_MAXIMA
+        < EFICIENCIA_METABOLICA_MINIMA
+    ):
+        raise ValueError(
+            "EFICIENCIA_METABOLICA_MAXIMA deve ser maior "
+            "ou igual à mínima."
+        )
+
+    if TAXA_MUTACAO_MINIMA < 0:
+        raise ValueError(
+            "TAXA_MUTACAO_MINIMA não pode ser negativa."
+        )
+
+    if TAXA_MUTACAO_MAXIMA > 1:
+        raise ValueError(
+            "TAXA_MUTACAO_MAXIMA não pode ser maior que 1."
+        )
+
+    if TAXA_MUTACAO_MAXIMA < TAXA_MUTACAO_MINIMA:
+        raise ValueError(
+            "TAXA_MUTACAO_MAXIMA deve ser maior ou igual "
+            "a TAXA_MUTACAO_MINIMA."
         )
 
     if QUADTREE_CAPACIDADE < 1:
@@ -338,7 +488,37 @@ def validar_configuracoes() -> None:
     ):
         raise ValueError(
             "VELOCIDADE_SIMULACAO_MAXIMA deve ser maior ou igual "
-            "à VELOCIDADE_SIMULACAO_MINIMA."
+            "à velocidade mínima."
+        )
+
+    if not VELOCIDADES_DISPONIVEIS:
+        raise ValueError(
+            "VELOCIDADES_DISPONIVEIS não pode estar vazio."
+        )
+
+    if any(
+        velocidade < VELOCIDADE_SIMULACAO_MINIMA
+        or velocidade > VELOCIDADE_SIMULACAO_MAXIMA
+        for velocidade in VELOCIDADES_DISPONIVEIS
+    ):
+        raise ValueError(
+            "Todas as velocidades disponíveis devem estar dentro "
+            "dos limites configurados."
+        )
+
+    if RAIO_MINIMO_SELECAO <= 0:
+        raise ValueError(
+            "RAIO_MINIMO_SELECAO deve ser maior que zero."
+        )
+
+    if MARGEM_SELECAO_ORGANISMO < 0:
+        raise ValueError(
+            "MARGEM_SELECAO_ORGANISMO não pode ser negativa."
+        )
+
+    if DURACAO_MENSAGEM_INTERFACE < 0:
+        raise ValueError(
+            "DURACAO_MENSAGEM_INTERFACE não pode ser negativa."
         )
 
 
