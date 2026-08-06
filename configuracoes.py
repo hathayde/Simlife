@@ -6,21 +6,13 @@ from __future__ import annotations
 # JANELA E ÁREA DA SIMULAÇÃO
 # ============================================================
 
-# Dimensão alinhada ao template padrão do Pygbag.
 LARGURA = 1280
 ALTURA = 720
 
-# Área principal do ecossistema.
 AREA_SIMULACAO_LARGURA = 880
+PAINEL_LATERAL_LARGURA = LARGURA - AREA_SIMULACAO_LARGURA
 
-# Painel lateral da interface.
-PAINEL_LATERAL_LARGURA = (
-    LARGURA - AREA_SIMULACAO_LARGURA
-)
-
-TITULO_JANELA = (
-    "SimLife — Evolução Microbiana"
-)
+TITULO_JANELA = "SimLife — Ecossistema Bacteriano"
 
 FPS = 30
 
@@ -39,129 +31,264 @@ CINZA_CLARO = (180, 180, 180)
 FUNDO_DIA = (8, 18, 24)
 FUNDO_NOITE = (2, 5, 12)
 
-COR_ALGA = (0, 120, 30)
-COR_CARCACA = (139, 69, 19)
-COR_PROTOZOARIO = (220, 50, 50)
+COR_CARCACA = (139, 89, 45)
 
-COR_GRAFICO_BACTERIAS = (0, 255, 100)
-COR_GRAFICO_ALGAS = (0, 150, 0)
-COR_GRAFICO_PROTOZOARIOS = (255, 80, 80)
+COR_GRAFICO_FOTOSSINTETICAS = (
+    80,
+    220,
+    110,
+)
+
+COR_GRAFICO_PREDADORAS = (
+    245,
+    90,
+    90,
+)
+
+COR_GRAFICO_NECROFAGAS = (
+    230,
+    180,
+    70,
+)
+
+COR_DESTAQUE_SELECAO = (
+    255,
+    220,
+    70,
+)
+
+
+# ============================================================
+# ESTRATÉGIAS ALIMENTARES
+# ============================================================
+
+ESTRATEGIA_FOTOSSINTESE = "fotossintese"
+ESTRATEGIA_PREDACAO = "predacao"
+ESTRATEGIA_NECROFAGIA = "necrofagia"
+
+ESTRATEGIAS_ALIMENTARES = (
+    ESTRATEGIA_FOTOSSINTESE,
+    ESTRATEGIA_PREDACAO,
+    ESTRATEGIA_NECROFAGIA,
+)
+
+CORES_ESTRATEGIAS = {
+    ESTRATEGIA_FOTOSSINTESE: (
+        80,
+        220,
+        110,
+    ),
+    ESTRATEGIA_PREDACAO: (
+        245,
+        90,
+        90,
+    ),
+    ESTRATEGIA_NECROFAGIA: (
+        230,
+        180,
+        70,
+    ),
+}
+
+NOMES_ESTRATEGIAS = {
+    ESTRATEGIA_FOTOSSINTESE: (
+        "Fotossintética"
+    ),
+    ESTRATEGIA_PREDACAO: (
+        "Predadora"
+    ),
+    ESTRATEGIA_NECROFAGIA: (
+        "Necrófaga"
+    ),
+}
 
 
 # ============================================================
 # POPULAÇÕES
 # ============================================================
 
-MAX_BACTERIAS = 100
-MAX_ALGAS = 500
-MAX_PROTOZOARIOS = 20
+MAX_BACTERIAS = 500
+MAX_CARCACAS = 700
 
-BACTERIAS_INICIAIS = 10
-ALGAS_INICIAIS = 500
-PROTOZOARIOS_INICIAIS = 5
+BACTERIAS_FOTOSSINTETICAS_INICIAIS = 40
+BACTERIAS_PREDADORAS_INICIAIS = 8
+BACTERIAS_NECROFAGAS_INICIAIS = 7
 
-QUANTIDADE_REINTRODUCAO_ALGAS = 100
+BACTERIAS_INICIAIS = (
+    BACTERIAS_FOTOSSINTETICAS_INICIAIS
+    + BACTERIAS_PREDADORAS_INICIAIS
+    + BACTERIAS_NECROFAGAS_INICIAIS
+)
 
 
 # ============================================================
 # CICLO AMBIENTAL
 # ============================================================
 
-# Quantidade de atualizações entre dia e noite.
 DURACAO_CICLO = 500
-
-# Quantidade de atualizações de uma estação ambiental.
 DURACAO_ESTACAO = 5000
 
 TEMPERATURA_MEDIA = 25.0
 UMIDADE_MEDIA = 0.70
 
-INTENSIDADE_MINIMA_DIA = 0.15
+INTENSIDADE_LUZ_DIA = 1.0
+INTENSIDADE_LUZ_NOITE = 0.05
+
+INTENSIDADE_MINIMA_FOTOSSINTESE = 0.15
 
 
 # ============================================================
-# ALGAS
+# NUTRIENTES DO AMBIENTE
 # ============================================================
 
-ENERGIA_INICIAL_ALGA = 100.0
-ENERGIA_REPRODUCAO_ALGA = 120.0
+TAMANHO_CELULA_NUTRIENTES = 40
 
-GANHO_BASE_FOTOSSINTESE = 2.0
-CUSTO_NOTURNO_ALGA = 0.1
+NIVEL_NUTRIENTES_INICIAL = 0.75
+NIVEL_NUTRIENTES_MINIMO = 0.0
+NIVEL_NUTRIENTES_MAXIMO = 1.0
 
-TAMANHO_ALGA = 3
-DISPERSAO_REPRODUCAO_ALGA = 8.0
+VARIACAO_INICIAL_NUTRIENTES = 0.20
+
+REGENERACAO_NATURAL_NUTRIENTES = 0.0005
+
+CONSUMO_NUTRIENTES_FOTOSSINTESE = 0.004
+
+RETORNO_NUTRIENTES_DECOMPOSICAO = 0.35
+
+RAIO_DISTRIBUICAO_NUTRIENTES = 35.0
 
 
 # ============================================================
-# BACTÉRIAS
+# ENERGIA DAS BACTÉRIAS
 # ============================================================
 
 ENERGIA_INICIAL_BACTERIA = 100.0
+ENERGIA_MAXIMA_BACTERIA = 400.0
+
 ENERGIA_REPRODUCAO_BACTERIA = 200.0
+
+# Fração da energia comprometida durante a divisão.
+CUSTO_REPRODUCAO_BACTERIA = 0.50
+
+ENERGIA_MINIMA_SOBREVIVENCIA = 0.0
 
 CUSTO_MOVIMENTO_BACTERIA = 0.02
 CUSTO_METABOLICO_BACTERIA = 0.008
 
-ENERGIA_CONSUMO_ALGA = 30.0
-ENERGIA_CONSUMO_CARCACA = 30.0
-ENERGIA_PREDACAO_BACTERIA = 50.0
+PENALIDADE_SEM_ALIMENTO = 0.10
 
-PENALIDADE_FALHA_PREDACAO = 10.0
-PENALIDADE_SEM_ALIMENTO = 0.1
 
-RAIO_DETECCAO_PADRAO = 100.0
-RAIO_DETECCAO_MINIMO = 20.0
-RAIO_DETECCAO_MAXIMO = 300.0
+# ============================================================
+# FOTOSSÍNTESE
+# ============================================================
 
-VELOCIDADE_MINIMA = 0.1
-VELOCIDADE_MAXIMA = 5.0
+GANHO_BASE_FOTOSSINTESE = 1.80
+
+EFICIENCIA_FOTOSSINTESE_MINIMA = 0.40
+EFICIENCIA_FOTOSSINTESE_MAXIMA = 2.00
+
+CUSTO_NOTURNO_FOTOSSINTETICA = 0.06
+
+MOVIMENTO_FOTOSSINTETICA_MINIMO = 0.25
+MOVIMENTO_FOTOSSINTETICA_MAXIMO = 1.50
+
+
+# ============================================================
+# PREDAÇÃO
+# ============================================================
+
+ENERGIA_PREDACAO_BACTERIA = 65.0
+
+PENALIDADE_FALHA_PREDACAO = 8.0
+
+RAIO_CACA_PADRAO = 110.0
+
+TEMPO_RECUPERACAO_ATAQUE = 12
+
+DISTANCIA_MAXIMA_CONTATO_PREDACAO = 2.0
+
+PREDADOR_PODE_ATACAR_MESMA_ESPECIE = False
+
+
+# ============================================================
+# NECROFAGIA
+# ============================================================
+
+EFICIENCIA_CONSUMO_CARCACA = 0.85
+
+RAIO_BUSCA_CARCACA_PADRAO = 120.0
+
+CONSUMO_MAXIMO_CARCACA_POR_FRAME = 8.0
+
+ENERGIA_MINIMA_CARCACA_CONSUMIVEL = 0.5
+
+
+# ============================================================
+# CARCAÇAS
+# ============================================================
+
+ENERGIA_INICIAL_CARCACA = 40.0
+
+TAMANHO_CARCACA = 4
+
+DEGRADACAO_CARCACA_PADRAO = 0.04
+
+ENERGIA_MINIMA_CARCACA = 0.1
+
+
+# ============================================================
+# GENES DAS BACTÉRIAS
+# ============================================================
+
+VELOCIDADE_MINIMA = 0.10
+VELOCIDADE_MAXIMA = 5.00
+
+VELOCIDADE_INICIAL_MINIMA = 0.50
+VELOCIDADE_INICIAL_MAXIMA = 1.50
 
 TAMANHO_MINIMO_BACTERIA = 2
 TAMANHO_MAXIMO_BACTERIA = 16
 
+TAMANHO_INICIAL_MINIMO = 4
+TAMANHO_INICIAL_MAXIMO = 6
+
+ESPERANCA_VIDA_MINIMA = 100
+
+ESPERANCA_VIDA_INICIAL_MINIMA = 1200
+ESPERANCA_VIDA_INICIAL_MAXIMA = 2400
+
 DEFESA_MINIMA = 0.05
 DEFESA_MAXIMA = 10.0
+
+DEFESA_INICIAL_MINIMA = 0.10
+DEFESA_INICIAL_MAXIMA = 1.00
 
 ATAQUE_MINIMO = 0.05
 ATAQUE_MAXIMO = 10.0
 
-ESPERANCA_VIDA_MINIMA = 100
+ATAQUE_INICIAL_MINIMO = 0.10
+ATAQUE_INICIAL_MAXIMO = 1.00
 
 EFICIENCIA_METABOLICA_MINIMA = 0.25
-EFICIENCIA_METABOLICA_MAXIMA = 2.5
-
-TAXA_MUTACAO_MINIMA = 0.001
-TAXA_MUTACAO_MAXIMA = 0.75
-
-
-# ============================================================
-# GENES INICIAIS DAS BACTÉRIAS
-# ============================================================
-
-VELOCIDADE_INICIAL_MINIMA = 0.5
-VELOCIDADE_INICIAL_MAXIMA = 1.5
-
-TAMANHO_INICIAL_MINIMO = 4
-TAMANHO_INICIAL_MAXIMO = 6
-
-ESPERANCA_VIDA_INICIAL_MINIMA = 1000
-ESPERANCA_VIDA_INICIAL_MAXIMA = 2000
-
-DEFESA_INICIAL_MINIMA = 0.1
-DEFESA_INICIAL_MAXIMA = 1.0
-
-ATAQUE_INICIAL_MINIMO = 0.1
-ATAQUE_INICIAL_MAXIMO = 1.0
+EFICIENCIA_METABOLICA_MAXIMA = 2.50
 
 EFICIENCIA_METABOLICA_INICIAL_MINIMA = 0.75
 EFICIENCIA_METABOLICA_INICIAL_MAXIMA = 1.25
 
+RAIO_DETECCAO_MINIMO = 20.0
+RAIO_DETECCAO_MAXIMO = 300.0
+
 RAIO_DETECCAO_INICIAL_MINIMO = 70.0
 RAIO_DETECCAO_INICIAL_MAXIMO = 130.0
 
-TAXA_MUTACAO_INICIAL_MINIMA = 0.05
-TAXA_MUTACAO_INICIAL_MAXIMA = 0.20
+TAXA_MUTACAO_MINIMA = 0.001
+TAXA_MUTACAO_MAXIMA = 0.75
+
+TAXA_MUTACAO_INICIAL_MINIMA = 0.03
+TAXA_MUTACAO_INICIAL_MAXIMA = 0.12
+
+EFICIENCIA_FOTOSSINTESE_INICIAL_MINIMA = 0.80
+EFICIENCIA_FOTOSSINTESE_INICIAL_MAXIMA = 1.20
 
 
 # ============================================================
@@ -169,12 +296,42 @@ TAXA_MUTACAO_INICIAL_MAXIMA = 0.20
 # ============================================================
 
 MUTACAO_VELOCIDADE_DESVIO = 0.15
+MUTACAO_TAMANHO_MAXIMA = 1
+
 MUTACAO_ESPERANCA_VIDA_MAXIMA = 150
+
 MUTACAO_DEFESA_DESVIO = 0.12
 MUTACAO_ATAQUE_DESVIO = 0.12
-MUTACAO_EFICIENCIA_DESVIO = 0.08
+
+MUTACAO_EFICIENCIA_METABOLICA_DESVIO = 0.08
+
+MUTACAO_EFICIENCIA_FOTOSSINTESE_DESVIO = 0.08
+
 MUTACAO_RAIO_DETECCAO_DESVIO = 8.0
+
 MUTACAO_TAXA_MUTACAO_DESVIO = 0.015
+
+# Mudanças de estratégia devem ser raras para preservar
+# especializações ecológicas.
+PROBABILIDADE_MUTACAO_ESTRATEGIA = 0.002
+
+PROBABILIDADE_MUTACAO_ESPECIE_ALVO = 0.01
+
+DISTANCIA_GENETICA_NOVA_ESPECIE = 0.35
+
+
+# ============================================================
+# REPRODUÇÃO
+# ============================================================
+
+# Bactérias se reproduzem por divisão assexuada.
+REPRODUCAO_ASSEXUADA = True
+
+DISTANCIA_MAXIMA_DESCENDENTE = 7.0
+
+DIVISAO_ENERGIA_REPRODUCAO = 0.50
+
+PROBABILIDADE_REPRODUCAO_POR_FRAME = 1.0
 
 
 # ============================================================
@@ -193,41 +350,11 @@ FATOR_REPULSAO = 0.10
 
 
 # ============================================================
-# CARCAÇAS
-# ============================================================
-
-ENERGIA_INICIAL_CARCACA = 30.0
-ENERGIA_CARCACA_PROTOZOARIO = 20.0
-
-TAMANHO_CARCACA = 3
-DEGRADACAO_CARCACA_PADRAO = 0.05
-
-
-# ============================================================
-# PROTOZOÁRIOS
-# ============================================================
-
-ENERGIA_INICIAL_PROTOZOARIO = 200.0
-
-ENERGIA_CONSUMO_BACTERIA_PROTOZOARIO = 50.0
-
-TAMANHO_PROTOZOARIO = 8
-VELOCIDADE_PROTOZOARIO = 1.0
-
-CUSTO_MOVIMENTO_PROTOZOARIO = 0.025
-CUSTO_METABOLICO_PROTOZOARIO = 0.1
-
-RAIO_DETECCAO_PROTOZOARIO = 150.0
-
-ESPERANCA_VIDA_PROTOZOARIO_MINIMA = 2500
-ESPERANCA_VIDA_PROTOZOARIO_MAXIMA = 4500
-
-
-# ============================================================
 # QUADTREE
 # ============================================================
 
 QUADTREE_CAPACIDADE = 8
+
 QUADTREE_PROFUNDIDADE_MAXIMA = 10
 
 
@@ -235,8 +362,6 @@ QUADTREE_PROFUNDIDADE_MAXIMA = 10
 # INTERFACE E HISTÓRICO
 # ============================================================
 
-# Mantida para compatibilidade com módulos antigos.
-# O novo main.py utiliza pygame.font.Font(None, tamanho).
 FONTE_PADRAO = "Arial"
 
 TAMANHO_FONTE = 16
@@ -257,19 +382,26 @@ VELOCIDADES_DISPONIVEIS = (
     8,
 )
 
-
-# ============================================================
-# INTERAÇÃO
-# ============================================================
-
-# Distância mínima usada para selecionar organismos pequenos.
 RAIO_MINIMO_SELECAO = 12.0
 
-# Espaço adicional ao redor do organismo para facilitar o clique.
 MARGEM_SELECAO_ORGANISMO = 8.0
 
-# Quantidade de frames durante os quais mensagens ficam visíveis.
 DURACAO_MENSAGEM_INTERFACE = 100
+
+
+# ============================================================
+# EVENTOS DA SIMULAÇÃO
+# ============================================================
+
+MAX_EVENTOS_REGISTRADOS = 100
+
+INTERVALO_ANALISE_EVENTOS = 60
+
+LIMIAR_QUEDA_POPULACIONAL = 0.40
+
+LIMIAR_DOMINANCIA_ESTRATEGIA = 0.70
+
+LIMIAR_NUTRIENTES_CRITICOS = 0.15
 
 
 # ============================================================
@@ -278,34 +410,28 @@ DURACAO_MENSAGEM_INTERFACE = 100
 
 def validar_configuracoes() -> None:
     """
-    Valida os principais parâmetros do projeto.
-
-    A função é executada automaticamente ao importar este módulo.
+    Valida os principais parâmetros antes da simulação começar.
     """
 
-    if LARGURA <= 0:
+    if LARGURA <= 0 or ALTURA <= 0:
         raise ValueError(
-            "LARGURA deve ser maior que zero."
+            "LARGURA e ALTURA devem ser maiores que zero."
         )
 
-    if ALTURA <= 0:
+    if not (
+        0
+        < AREA_SIMULACAO_LARGURA
+        < LARGURA
+    ):
         raise ValueError(
-            "ALTURA deve ser maior que zero."
-        )
-
-    if AREA_SIMULACAO_LARGURA <= 0:
-        raise ValueError(
-            "AREA_SIMULACAO_LARGURA deve ser maior que zero."
-        )
-
-    if AREA_SIMULACAO_LARGURA >= LARGURA:
-        raise ValueError(
-            "AREA_SIMULACAO_LARGURA deve ser menor que LARGURA."
+            "AREA_SIMULACAO_LARGURA deve estar "
+            "entre 0 e LARGURA."
         )
 
     if PAINEL_LATERAL_LARGURA <= 0:
         raise ValueError(
-            "PAINEL_LATERAL_LARGURA deve ser maior que zero."
+            "PAINEL_LATERAL_LARGURA deve ser "
+            "maior que zero."
         )
 
     if (
@@ -314,8 +440,8 @@ def validar_configuracoes() -> None:
         != LARGURA
     ):
         raise ValueError(
-            "A área da simulação e o painel devem completar "
-            "a largura total da janela."
+            "A área da simulação e o painel devem "
+            "completar a largura total."
         )
 
     if FPS <= 0:
@@ -323,34 +449,75 @@ def validar_configuracoes() -> None:
             "FPS deve ser maior que zero."
         )
 
-    if MAX_BACTERIAS < 0:
+    if not ESTRATEGIAS_ALIMENTARES:
         raise ValueError(
-            "MAX_BACTERIAS não pode ser negativo."
+            "ESTRATEGIAS_ALIMENTARES não pode "
+            "estar vazio."
         )
 
-    if MAX_ALGAS < 0:
+    if (
+        len(
+            set(
+                ESTRATEGIAS_ALIMENTARES
+            )
+        )
+        != len(
+            ESTRATEGIAS_ALIMENTARES
+        )
+    ):
         raise ValueError(
-            "MAX_ALGAS não pode ser negativo."
+            "As estratégias alimentares devem ser únicas."
         )
 
-    if MAX_PROTOZOARIOS < 0:
+    if (
+        set(
+            CORES_ESTRATEGIAS
+        )
+        != set(
+            ESTRATEGIAS_ALIMENTARES
+        )
+    ):
         raise ValueError(
-            "MAX_PROTOZOARIOS não pode ser negativo."
+            "CORES_ESTRATEGIAS deve conter "
+            "todas as estratégias."
         )
 
-    if BACTERIAS_INICIAIS < 0:
+    if (
+        set(
+            NOMES_ESTRATEGIAS
+        )
+        != set(
+            ESTRATEGIAS_ALIMENTARES
+        )
+    ):
         raise ValueError(
-            "BACTERIAS_INICIAIS não pode ser negativo."
+            "NOMES_ESTRATEGIAS deve conter "
+            "todas as estratégias."
         )
 
-    if ALGAS_INICIAIS < 0:
+    if MAX_BACTERIAS < 1:
         raise ValueError(
-            "ALGAS_INICIAIS não pode ser negativo."
+            "MAX_BACTERIAS deve ser pelo menos 1."
         )
 
-    if PROTOZOARIOS_INICIAIS < 0:
+    if MAX_CARCACAS < 0:
         raise ValueError(
-            "PROTOZOARIOS_INICIAIS não pode ser negativo."
+            "MAX_CARCACAS não pode ser negativo."
+        )
+
+    populacoes_iniciais = (
+        BACTERIAS_FOTOSSINTETICAS_INICIAIS,
+        BACTERIAS_PREDADORAS_INICIAIS,
+        BACTERIAS_NECROFAGAS_INICIAIS,
+    )
+
+    if any(
+        quantidade < 0
+        for quantidade in populacoes_iniciais
+    ):
+        raise ValueError(
+            "As populações iniciais não podem "
+            "ser negativas."
         )
 
     if BACTERIAS_INICIAIS > MAX_BACTERIAS:
@@ -359,30 +526,13 @@ def validar_configuracoes() -> None:
             "MAX_BACTERIAS."
         )
 
-    if ALGAS_INICIAIS > MAX_ALGAS:
+    if (
+        DURACAO_CICLO <= 0
+        or DURACAO_ESTACAO <= 0
+    ):
         raise ValueError(
-            "ALGAS_INICIAIS não pode exceder MAX_ALGAS."
-        )
-
-    if PROTOZOARIOS_INICIAIS > MAX_PROTOZOARIOS:
-        raise ValueError(
-            "PROTOZOARIOS_INICIAIS não pode exceder "
-            "MAX_PROTOZOARIOS."
-        )
-
-    if QUANTIDADE_REINTRODUCAO_ALGAS < 0:
-        raise ValueError(
-            "QUANTIDADE_REINTRODUCAO_ALGAS não pode ser negativa."
-        )
-
-    if DURACAO_CICLO <= 0:
-        raise ValueError(
-            "DURACAO_CICLO deve ser maior que zero."
-        )
-
-    if DURACAO_ESTACAO <= 0:
-        raise ValueError(
-            "DURACAO_ESTACAO deve ser maior que zero."
+            "DURACAO_CICLO e DURACAO_ESTACAO "
+            "devem ser positivos."
         )
 
     if not 0.0 <= UMIDADE_MEDIA <= 1.0:
@@ -390,56 +540,139 @@ def validar_configuracoes() -> None:
             "UMIDADE_MEDIA deve estar entre 0 e 1."
         )
 
-    if not 0.0 <= INTENSIDADE_MINIMA_DIA <= 1.0:
+    if not 0.0 <= INTENSIDADE_LUZ_DIA <= 1.0:
         raise ValueError(
-            "INTENSIDADE_MINIMA_DIA deve estar entre 0 e 1."
+            "INTENSIDADE_LUZ_DIA deve estar "
+            "entre 0 e 1."
         )
 
-    if ENERGIA_REPRODUCAO_ALGA <= 0:
+    if not 0.0 <= INTENSIDADE_LUZ_NOITE <= 1.0:
         raise ValueError(
-            "ENERGIA_REPRODUCAO_ALGA deve ser maior que zero."
+            "INTENSIDADE_LUZ_NOITE deve estar "
+            "entre 0 e 1."
+        )
+
+    if (
+        INTENSIDADE_LUZ_NOITE
+        > INTENSIDADE_LUZ_DIA
+    ):
+        raise ValueError(
+            "A luz noturna não pode superar "
+            "a luz diurna."
+        )
+
+    if not (
+        0.0
+        <= INTENSIDADE_MINIMA_FOTOSSINTESE
+        <= 1.0
+    ):
+        raise ValueError(
+            "INTENSIDADE_MINIMA_FOTOSSINTESE "
+            "deve estar entre 0 e 1."
+        )
+
+    if TAMANHO_CELULA_NUTRIENTES < 1:
+        raise ValueError(
+            "TAMANHO_CELULA_NUTRIENTES deve ser "
+            "pelo menos 1."
+        )
+
+    if not (
+        NIVEL_NUTRIENTES_MINIMO
+        <= NIVEL_NUTRIENTES_INICIAL
+        <= NIVEL_NUTRIENTES_MAXIMO
+    ):
+        raise ValueError(
+            "NIVEL_NUTRIENTES_INICIAL deve estar "
+            "dentro dos limites."
+        )
+
+    if VARIACAO_INICIAL_NUTRIENTES < 0:
+        raise ValueError(
+            "VARIACAO_INICIAL_NUTRIENTES não pode "
+            "ser negativa."
+        )
+
+    if ENERGIA_INICIAL_BACTERIA <= 0:
+        raise ValueError(
+            "ENERGIA_INICIAL_BACTERIA deve ser "
+            "maior que zero."
+        )
+
+    if (
+        ENERGIA_MAXIMA_BACTERIA
+        < ENERGIA_INICIAL_BACTERIA
+    ):
+        raise ValueError(
+            "ENERGIA_MAXIMA_BACTERIA deve ser "
+            "maior ou igual à inicial."
         )
 
     if ENERGIA_REPRODUCAO_BACTERIA <= 0:
         raise ValueError(
-            "ENERGIA_REPRODUCAO_BACTERIA deve ser maior que zero."
+            "ENERGIA_REPRODUCAO_BACTERIA deve ser "
+            "maior que zero."
         )
 
-    if TAMANHO_MINIMO_BACTERIA < 1:
+    if not (
+        0.0
+        < CUSTO_REPRODUCAO_BACTERIA
+        < 1.0
+    ):
         raise ValueError(
-            "TAMANHO_MINIMO_BACTERIA deve ser pelo menos 1."
+            "CUSTO_REPRODUCAO_BACTERIA deve estar "
+            "entre 0 e 1."
+        )
+
+    if not (
+        0.0
+        < DIVISAO_ENERGIA_REPRODUCAO
+        < 1.0
+    ):
+        raise ValueError(
+            "DIVISAO_ENERGIA_REPRODUCAO deve estar "
+            "entre 0 e 1."
+        )
+
+    if not (
+        0.0
+        <= PROBABILIDADE_REPRODUCAO_POR_FRAME
+        <= 1.0
+    ):
+        raise ValueError(
+            "PROBABILIDADE_REPRODUCAO_POR_FRAME "
+            "deve estar entre 0 e 1."
         )
 
     if (
-        TAMANHO_MAXIMO_BACTERIA
+        VELOCIDADE_MINIMA <= 0
+        or VELOCIDADE_MAXIMA
+        < VELOCIDADE_MINIMA
+    ):
+        raise ValueError(
+            "Os limites de velocidade são inválidos."
+        )
+
+    if (
+        TAMANHO_MINIMO_BACTERIA < 1
+        or TAMANHO_MAXIMO_BACTERIA
         < TAMANHO_MINIMO_BACTERIA
     ):
         raise ValueError(
-            "TAMANHO_MAXIMO_BACTERIA deve ser maior ou igual "
-            "a TAMANHO_MINIMO_BACTERIA."
-        )
-
-    if VELOCIDADE_MINIMA <= 0:
-        raise ValueError(
-            "VELOCIDADE_MINIMA deve ser maior que zero."
-        )
-
-    if VELOCIDADE_MAXIMA < VELOCIDADE_MINIMA:
-        raise ValueError(
-            "VELOCIDADE_MAXIMA deve ser maior ou igual "
-            "a VELOCIDADE_MINIMA."
+            "Os limites de tamanho das bactérias "
+            "são inválidos."
         )
 
     if DEFESA_MAXIMA < DEFESA_MINIMA:
         raise ValueError(
-            "DEFESA_MAXIMA deve ser maior ou igual "
-            "a DEFESA_MINIMA."
+            "DEFESA_MAXIMA deve ser maior ou "
+            "igual à mínima."
         )
 
     if ATAQUE_MAXIMO < ATAQUE_MINIMO:
         raise ValueError(
-            "ATAQUE_MAXIMO deve ser maior ou igual "
-            "a ATAQUE_MINIMO."
+            "ATAQUE_MAXIMO deve ser maior ou "
+            "igual ao mínimo."
         )
 
     if (
@@ -447,53 +680,66 @@ def validar_configuracoes() -> None:
         < EFICIENCIA_METABOLICA_MINIMA
     ):
         raise ValueError(
-            "EFICIENCIA_METABOLICA_MAXIMA deve ser maior "
+            "Os limites de eficiência metabólica "
+            "são inválidos."
+        )
+
+    if (
+        EFICIENCIA_FOTOSSINTESE_MAXIMA
+        < EFICIENCIA_FOTOSSINTESE_MINIMA
+    ):
+        raise ValueError(
+            "Os limites de eficiência fotossintética "
+            "são inválidos."
+        )
+
+    if (
+        TAXA_MUTACAO_MINIMA < 0
+        or TAXA_MUTACAO_MAXIMA > 1
+    ):
+        raise ValueError(
+            "As taxas de mutação devem estar "
+            "entre 0 e 1."
+        )
+
+    if (
+        TAXA_MUTACAO_MAXIMA
+        < TAXA_MUTACAO_MINIMA
+    ):
+        raise ValueError(
+            "TAXA_MUTACAO_MAXIMA deve ser maior "
             "ou igual à mínima."
         )
 
-    if TAXA_MUTACAO_MINIMA < 0:
-        raise ValueError(
-            "TAXA_MUTACAO_MINIMA não pode ser negativa."
-        )
+    probabilidades = (
+        PROBABILIDADE_MUTACAO_ESTRATEGIA,
+        PROBABILIDADE_MUTACAO_ESPECIE_ALVO,
+    )
 
-    if TAXA_MUTACAO_MAXIMA > 1:
+    if any(
+        not 0.0 <= probabilidade <= 1.0
+        for probabilidade in probabilidades
+    ):
         raise ValueError(
-            "TAXA_MUTACAO_MAXIMA não pode ser maior que 1."
-        )
-
-    if TAXA_MUTACAO_MAXIMA < TAXA_MUTACAO_MINIMA:
-        raise ValueError(
-            "TAXA_MUTACAO_MAXIMA deve ser maior ou igual "
-            "a TAXA_MUTACAO_MINIMA."
+            "As probabilidades de mutação devem "
+            "estar entre 0 e 1."
         )
 
     if QUADTREE_CAPACIDADE < 1:
         raise ValueError(
-            "QUADTREE_CAPACIDADE deve ser maior ou igual a 1."
+            "QUADTREE_CAPACIDADE deve ser pelo menos 1."
         )
 
     if QUADTREE_PROFUNDIDADE_MAXIMA < 0:
         raise ValueError(
-            "QUADTREE_PROFUNDIDADE_MAXIMA não pode ser negativa."
-        )
-
-    if VELOCIDADE_SIMULACAO_MINIMA < 1:
-        raise ValueError(
-            "VELOCIDADE_SIMULACAO_MINIMA deve ser pelo menos 1."
-        )
-
-    if (
-        VELOCIDADE_SIMULACAO_MAXIMA
-        < VELOCIDADE_SIMULACAO_MINIMA
-    ):
-        raise ValueError(
-            "VELOCIDADE_SIMULACAO_MAXIMA deve ser maior ou igual "
-            "à velocidade mínima."
+            "QUADTREE_PROFUNDIDADE_MAXIMA não pode "
+            "ser negativa."
         )
 
     if not VELOCIDADES_DISPONIVEIS:
         raise ValueError(
-            "VELOCIDADES_DISPONIVEIS não pode estar vazio."
+            "VELOCIDADES_DISPONIVEIS não pode "
+            "estar vazio."
         )
 
     if any(
@@ -502,23 +748,20 @@ def validar_configuracoes() -> None:
         for velocidade in VELOCIDADES_DISPONIVEIS
     ):
         raise ValueError(
-            "Todas as velocidades disponíveis devem estar dentro "
-            "dos limites configurados."
+            "As velocidades disponíveis devem "
+            "respeitar os limites."
         )
 
     if RAIO_MINIMO_SELECAO <= 0:
         raise ValueError(
-            "RAIO_MINIMO_SELECAO deve ser maior que zero."
+            "RAIO_MINIMO_SELECAO deve ser "
+            "maior que zero."
         )
 
     if MARGEM_SELECAO_ORGANISMO < 0:
         raise ValueError(
-            "MARGEM_SELECAO_ORGANISMO não pode ser negativa."
-        )
-
-    if DURACAO_MENSAGEM_INTERFACE < 0:
-        raise ValueError(
-            "DURACAO_MENSAGEM_INTERFACE não pode ser negativa."
+            "MARGEM_SELECAO_ORGANISMO não pode "
+            "ser negativa."
         )
 
 
