@@ -1,4 +1,3 @@
-```python
 # configuracoes.py
 from __future__ import annotations
 
@@ -344,4 +343,3 @@ def validar_configuracoes() -> None:
 
 
 validar_configuracoes()
-```
