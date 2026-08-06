@@ -1,6 +1,7 @@
 # main.py
 from __future__ import annotations
 
+import asyncio
 import sys
 from collections import deque
 
@@ -53,24 +54,29 @@ class Aplicacao:
             maxlen=tamanho_historico
         )
 
-    def executar(self) -> None:
-        """Executa o loop principal."""
-
+    async def executar(self) -> None:
+        """Executa o loop principal no desktop e no navegador."""
+    
         while self.rodando:
             self.processar_eventos()
-
+    
             if not self.pausado:
                 for _ in range(self.velocidade_simulacao):
                     self.mundo.atualizar()
                     self.frame += 1
-
+    
                 self.registrar_historico()
-
+    
             self.desenhar()
             self.relogio.tick(FPS)
-
-        pygame.quit()
-        sys.exit()
+    
+            # Entrega o controle ao navegador a cada frame.
+            # Obrigatório para execução com Pygbag/WebAssembly.
+            await asyncio.sleep(0)
+    
+        # No navegador não devemos encerrar o processo com sys.exit().
+        if sys.platform != "emscripten":
+            pygame.quit()
 
     def processar_eventos(self) -> None:
         """Processa teclado, mouse e encerramento da janela."""
@@ -527,10 +533,10 @@ class Aplicacao:
             linha_y += 27
 
 
-def main() -> None:
+async def main() -> None:
     aplicacao = Aplicacao()
-    aplicacao.executar()
+    await aplicacao.executar()
 
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
